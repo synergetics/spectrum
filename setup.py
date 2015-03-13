@@ -18,10 +18,10 @@ setup(
   },
 
   # metadata for upload to PyPI
-  # author = "Me",
-  # author_email = "me@example.com",
-  # description = "This is an Example Package",
-  # license = "PSF",
-  # keywords = "hello world example examples",
-  # url = "http://example.com/HelloWorld/",   # project home page, if any
+  author = "ixaxaar",
+  author_email = "root@ixaxaar.in",
+  description = "Higher Order Spectrum Estimation toolkit",
+  license = "MIT",
+  keywords = "Higher Order Spectrum Estimation toolkit",
+  url = "https://github.com/synergetics/spectrum",
 )
