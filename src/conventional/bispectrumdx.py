@@ -184,7 +184,7 @@ def bispectrumdx(x, y, z, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  nl1 = sio.loadmat('matfile/demo/nl1.mat')
+  nl1 = sio.loadmat('demo/nl1.mat')
   dbic = bispectrumdx(nl1['x'], nl1['x'], nl1['y'], 128,5)
 
 

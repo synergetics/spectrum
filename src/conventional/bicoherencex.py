@@ -145,7 +145,7 @@ def bicoherencex(w, x, y, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  nl1 = sio.loadmat('matfile/demo/nl1.mat')
+  nl1 = sio.loadmat('demo/nl1.mat')
   dbic = bicoherencex(nl1['x'], nl1['x'], nl1['y'])
 
 

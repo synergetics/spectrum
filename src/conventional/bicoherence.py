@@ -123,7 +123,7 @@ def bicoherence(y, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  qpc = sio.loadmat('matfile/demo/qpc.mat')
+  qpc = sio.loadmat('demo/qpc.mat')
   dbic = bicoherence(qpc['zmat'])
 
 

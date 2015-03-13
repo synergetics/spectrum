@@ -142,7 +142,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None,
 
 
 def test():
-  qpc = sio.loadmat('matfile/demo/qpc.mat')
+  qpc = sio.loadmat('demo/qpc.mat')
   dbic = bispectrumi(qpc['zmat'],  21, 64, 0, 'unbiased', 128, 1)
 
 
