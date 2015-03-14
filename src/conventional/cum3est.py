@@ -50,7 +50,7 @@ def cum3est(y, maxlag, nsamp, overlap, flag, k1):
   y = y.ravel(order='F')
   for i in xrange(nrecord):
     x = y[ind]
-    x = x.ravel(order='F') - mean(x)
+    x = x.ravel(order='F') - np.mean(x)
     cx = np.conj(x)
     z = x * 0
 

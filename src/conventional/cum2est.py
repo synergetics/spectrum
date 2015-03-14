@@ -37,7 +37,7 @@ def cum2est(y, maxlag, nsamp, overlap, flag):
 
   for i in xrange(nrecord):
     x = y[ind]
-    x = x.ravel(order='F') - mean(x)
+    x = x.ravel(order='F') - np.mean(x)
 
     for k in xrange(maxlag+1):
       y_cum[k] = y_cum[k] + x[0:nsamp-k].T * x[k:nsamp]
