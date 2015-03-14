@@ -7,9 +7,6 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 
 from tools import *
-from cum2est import *
-from cum3est import *
-from cum4est import *
 
 
 def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag='biased'):

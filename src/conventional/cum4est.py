@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from tools import *
 
 
-def cum4est(y, maxlag, nsamp, overlap, flag, k1, k2):
+def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag='biased', k1=0, k2=0):
   """
   CUM4EST Fourth-order cumulants.
   Parameters:
