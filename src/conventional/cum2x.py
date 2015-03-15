@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag='biased'):

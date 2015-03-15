@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def bispectrumdx(x, y, z, nfft=None, wind=None, nsamp=None, overlap=None):
@@ -184,7 +184,7 @@ def bispectrumdx(x, y, z, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  nl1 = sio.loadmat('demo/nl1.mat')
+  nl1 = sio.loadmat(here(__file__) + '/demo/nl1.mat')
   dbic = bispectrumdx(nl1['x'], nl1['x'], nl1['y'], 128,5)
 
 

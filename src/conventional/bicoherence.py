@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def bicoherence(y, nfft=None, wind=None, nsamp=None, overlap=None):
@@ -123,7 +123,7 @@ def bicoherence(y, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  qpc = sio.loadmat('demo/qpc.mat')
+  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
   dbic = bicoherence(qpc['zmat'])
 
 

@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
@@ -165,7 +165,7 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  qpc = sio.loadmat('demo/qpc.mat')
+  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
   dbic = bispectrumd(qpc['zmat'], 128,3,64,0)
 
 

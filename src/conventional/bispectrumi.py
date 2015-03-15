@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 np.set_printoptions(linewidth=120)
 
@@ -142,7 +142,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None,
 
 
 def test():
-  qpc = sio.loadmat('demo/qpc.mat')
+  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
   dbic = bispectrumi(qpc['zmat'],  21, 64, 0, 'unbiased', 128, 1)
 
 

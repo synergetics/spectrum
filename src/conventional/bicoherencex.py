@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def bicoherencex(w, x, y, nfft=None, wind=None, nsamp=None, overlap=None):
@@ -145,7 +145,7 @@ def bicoherencex(w, x, y, nfft=None, wind=None, nsamp=None, overlap=None):
 
 
 def test():
-  nl1 = sio.loadmat('demo/nl1.mat')
+  nl1 = sio.loadmat(here(__file__) + '/demo/nl1.mat')
   dbic = bicoherencex(nl1['x'], nl1['x'], nl1['y'])
 
 

@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from tools import *
+from ..tools import *
 
 
 def cum3x(x, y, z, maxlag=0, nsamp=0, overlap=0, flag='biased', k1=0):

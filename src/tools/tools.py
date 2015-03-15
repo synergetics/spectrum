@@ -2,6 +2,8 @@
 
 
 import numpy as np
+import sys
+import os
 
 
 def nextpow2(num):
@@ -50,4 +52,11 @@ def make_arr(arrs, axis=0):
       a.append(x)
     ctr += 1
   return np.concatenate(a, axis)
+
+
+def here(f=__file__):
+  """
+  This script's directory
+  """
+  return os.path.dirname(os.path.realpath(f))
 
