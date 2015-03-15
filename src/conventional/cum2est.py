@@ -32,25 +32,26 @@ def cum2est(y, maxlag, nsamp, overlap, flag):
   nrecord  = np.fix((N - overlap)/(nsamp - overlap))
   nadvance = nsamp - overlap
 
-  y_cum    = zeros(maxlag+1,1)
-  ind = range(nsamp)
+  y_cum    = np.zeros([maxlag+1, 1])
+  ind = np.arange(nsamp)
+  y = y.ravel(order='F')
 
   for i in xrange(nrecord):
     x = y[ind]
-    x = x.ravel(order='F') - np.mean(x)
+    x = x - np.mean(x)
 
     for k in xrange(maxlag+1):
-      y_cum[k] = y_cum[k] + x[0:nsamp-k].T * x[k:nsamp]
+      y_cum[k] = y_cum[k] + np.dot(x[0:nsamp-k].T, x[k:nsamp])
 
-    ind = ind + nadvance
+    ind = ind + int(nadvance)
 
   if flag == 'biased':
-    y_cum = y_cum / (nsamp*nrecord)
+    y_cum = y_cum / (nsamp * nrecord)
   else:
-    y_cum = y_cum / (nrecord * (nsamp-[0:maxlag].T))
+    y_cum = y_cum / (nrecord * (nsamp-np.matrix(range(maxlag+1)).T))
 
   if maxlag > 0:
-    y_cum = make_arr([np.conj(y_cum(maxlag+1:-1:2)), y_cum], axis=0)
+    y_cum = make_arr([np.conj(y_cum[maxlag:0:-1]), y_cum], axis=0)
 
   return y_cum
 
