@@ -26,7 +26,7 @@ def cum2est(y, maxlag, nsamp, overlap, flag):
               C2(m)  -maxlag <= m <= maxlag
   """
 
-  (n1, n2) = y.shape
+  (n1, n2) = shape(y, 2)
   N = n1*n2
   overlap  = np.fix(overlap/100 * nsamp)
   nrecord  = np.fix((N - overlap)/(nsamp - overlap))
@@ -49,6 +49,7 @@ def cum2est(y, maxlag, nsamp, overlap, flag):
     y_cum = y_cum / (nsamp * nrecord)
   else:
     y_cum = y_cum / (nrecord * (nsamp-np.matrix(range(maxlag+1)).T))
+    y_cum = np.asarray(y_cum)
 
   if maxlag > 0:
     y_cum = make_arr([np.conj(y_cum[maxlag:0:-1]), y_cum], axis=0)

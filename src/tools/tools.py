@@ -54,6 +54,18 @@ def make_arr(arrs, axis=0):
   return np.concatenate(a, axis)
 
 
+def shape(o, n):
+  """
+  Behave like MATLAB's shape
+  """
+  s = o.shape
+  if len(s) < n:
+    x = tuple(np.ones(n-len(s)))
+    return s + x
+  else:
+    return s
+
+
 def here(f=__file__):
   """
   This script's directory
