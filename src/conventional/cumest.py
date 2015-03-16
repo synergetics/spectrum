@@ -60,3 +60,27 @@ def cumest(y, norder=2, maxlag=0 ,nsamp=None, overlap=0, flag='biased' ,k1=0, k2
   return y_cum
 
 
+def test():
+  y = sio.loadmat(here(__file__) + '/demo/ma1.mat')['y']
+
+  # The right results are:
+  #           "biased": [-0.12250513  0.35963613  1.00586945  0.35963613 -0.12250513]
+  #           "unbiaed": [-0.12444965  0.36246791  1.00586945  0.36246791 -0.12444965]
+  print cum2est(y, 2, 128, 0, 'unbiased')
+  print cum2est(y, 2, 128, 0, 'biased')
+
+  # For the 3rd cumulant:
+  #           "biased": [-0.18203039  0.07751503  0.67113035  0.729953    0.07751503]
+  #           "unbiased": [-0.18639911  0.07874543  0.67641484  0.74153955  0.07937539]
+  print cum3est(y, 2, 128, 0, 'biased', 1)
+  print cum3est(y, 2, 128, 0, 'unbiased', 1)
+
+  # For testing the 4th-order cumulant
+  # "biased": [-0.03642083  0.4755026   0.6352588   1.38975232  0.83791117  0.41641134 -0.97386322]
+  # "unbiased": [-0.04011388  0.48736793  0.64948927  1.40734633  0.8445089   0.42303979 -0.99724968]
+  print cum4est(y, 3, 128, 0, 'biased', 1, 1)
+  print cum4est(y, 3, 128, 0, 'unbiased', 1, 1)
+
+
+if __name__ == '__main__':
+  test()
