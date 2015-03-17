@@ -49,32 +49,45 @@ def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag='biased'):
     nrecs = np.fix((lx - overlap)/nadvance)
 
   nlags = 2*maxlag+1
-  zlag  = maxlag + 1
-  y_cum = zeros(nlags,1)
+  zlag  = maxlag
+  y_cum = np.zeros([nlags,1])
 
   if flag == 'biased':
     scale = np.ones([nlags, 1])/nsamp
   else:
-    scale = make_arr((range(lx-maxlag, lx-1, -1), range(lx-1, lx-maxlag, -1)), axis=1).T
+    scale = make_arr((range(lx-maxlag, lx+1), range(lx-1, lx-maxlag-1, -1)), axis=1).T
     scale = np.ones([2*maxlag+1, 1]) / scale
-
 
   ind = np.arange(nsamp).T
   for k in xrange(nrecs):
-    xs = x[ind]
-    xs = xs.reshape(1,-1) - np.mean(xs)
-    ys = y[ind]
-    ys = ys.reshape(1,-1) - np.mean(ys)
+    xs = x[ind].ravel(order='F')
+    xs = xs - np.mean(xs)
+    ys = y[ind].ravel(order='F')
+    ys = ys - np.mean(ys)
 
-    y_cum[zlag] = y_cum[zlag] + xs.T * ys
+    y_cum[zlag] = y_cum[zlag] + np.dot(xs, ys)
 
-    for m in xrange(maxlag):
-      y_cum[zlag-m] = y_cum[zlag-m] + xs[m:nsamp].T * ys[0:nsamp-m]
-      y_cum[zlag+m] = y_cum[zlag+m] + xs[0:nsamp-m].T * ys[m:nsamp]
+    for m in xrange(1, maxlag+1):
+      y_cum[zlag-m] = y_cum[zlag-m] + np.dot(xs[m:nsamp].T, ys[0:nsamp-m])
+      y_cum[zlag+m] = y_cum[zlag+m] + np.dot(xs[0:nsamp-m].T, ys[m:nsamp])
 
     ind = ind + int(nadvance)
 
   y_cum = y_cum * scale / nrecs
 
   return y_cum
+
+
+def test():
+  y = sio.loadmat(here(__file__) + '/demo/ma1.mat')['y']
+
+  # The right results are:
+  #           "biased": [--0.25719  -0.12011   0.35908   1.01378   0.35908  -0.12011  -0.25719]
+  #           "unbiased": [-0.025190  -0.011753   0.035101   0.099002   0.035101  -0.011753  -0.025190]
+  print cum2x(y, y, 3, 100, 0, "biased")
+  print cum2x(y, y, 3, 100, 0, "unbiased")
+
+
+if __name__ == '__main__':
+  test()
 
