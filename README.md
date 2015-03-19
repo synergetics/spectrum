@@ -9,6 +9,7 @@ Higher Order Spectrum Estimation toolkit
 - Bispectrum Indirect
 - Cross Bispectrum (Direct)
 - 2nd, 3rd and 4th order cumulants
+- 2nd, 3rd and 4th order cumulants
 
 More coming soon
 
