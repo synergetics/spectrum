@@ -9,6 +9,7 @@ from spectrum import bicoherence
 
 bicoherence(y, nfft=None, wind=None, nsamp=None, overlap=None)
 ```
+![bicoher](https://raw.githubusercontent.com/synergetics/spectrum/master/images/bicoherence.png)
 
 - Cross Bicoherence
 ```python
@@ -16,6 +17,7 @@ from spectrum import bicoherencex
 
 bicoherencex(w, x, y, nfft=None, wind=None, nsamp=None, overlap=None)
 ```
+![bicoherx](https://raw.githubusercontent.com/synergetics/spectrum/master/images/cross_bicoherence.png)
 
 - Bispectrum Direct (using fft)
 ```python
@@ -23,6 +25,7 @@ from spectrum import bispectrumd
 
 bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None)
 ```
+![bispectr](https://raw.githubusercontent.com/synergetics/spectrum/master/images/bispectrumd.png)
 
 - Bispectrum Indirect
 ```python
@@ -30,6 +33,7 @@ from spectrum import bispectrumi
 
 bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag='biased', nfft=None, wind=None)
 ```
+![bispectri](https://raw.githubusercontent.com/synergetics/spectrum/master/images/bispectrum_indirect.png)
 
 - Cross Bispectrum (Direct)
 ```python
@@ -37,6 +41,7 @@ from spectrum import bispectrumdx
 
 bispectrumdx(x, y, z, nfft=None, wind=None, nsamp=None, overlap=None)
 ```
+![bispectrdx](https://raw.githubusercontent.com/synergetics/spectrum/master/images/cross_bispectrum.png)
 
 - 2nd, 3rd and 4th order cumulants
 ```python
