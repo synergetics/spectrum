@@ -9,7 +9,7 @@ setup(
   packages = find_packages(),
   # scripts = ['say_hello.py'],
 
-  install_requires = ['numpy>=1.8', 'scipy>13.3', 'matplotlib>1.3.1'],
+  install_requires = ['numpy>=1.8', 'scipy>0.13.3', 'matplotlib>1.3.1'],
 
   include_package_data = True,
 
