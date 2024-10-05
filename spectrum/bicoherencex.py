@@ -3,37 +3,43 @@ from scipy.linalg import hankel
 import matplotlib.pyplot as plt
 
 
-def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
+def bicoherencex(w, x, y, nfft=None, window=None, nsamp=None, overlap=None):
     """
-    Direct (FD) method for estimating bicoherence.
+    Direct (FD) method for estimating cross-bicoherence.
 
     Parameters:
     -----------
-    y : array_like
-        Input data vector or time-series.
+    w, x, y : array_like
+        Input data vectors or time-series with identical dimensions.
     nfft : int, optional
         FFT length. If None, uses the next power of two > nsamp.
     window : array_like, optional
         Time-domain window to be applied to each data segment.
         If None, a Hanning window is used.
     nsamp : int, optional
-        Samples per segment. If None, uses 8 segments.
+        Samples per segment. If None, uses the entire data length.
     overlap : int, optional
         Percentage overlap of segments (0-99). If None, uses 50%.
 
     Returns:
     --------
     bic : ndarray
-        Estimated bicoherence: an nfft x nfft array, with origin
+        Estimated cross-bicoherence: an nfft x nfft array, with origin
         at the center, and axes pointing down and to the right.
     waxis : ndarray
         Vector of frequencies associated with the rows and columns of bic.
     """
+    # Ensure inputs are numpy arrays and have the same shape
+    w, x, y = map(np.asarray, (w, x, y))
+    if not (w.shape == x.shape == y.shape):
+        raise ValueError("w, x, and y must have identical dimensions")
+
     # Reshape input if necessary
-    y = np.asarray(y)
-    if y.ndim == 1:
+    if w.ndim == 1:
+        w = w.reshape(1, -1)
+        x = x.reshape(1, -1)
         y = y.reshape(1, -1)
-    ly, nrecs = y.shape
+    ly, nrecs = w.shape
 
     # Set default parameters
     if nfft is None:
@@ -41,17 +47,16 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
     if overlap is None:
         overlap = 50 if nrecs == 1 else 0
     if nsamp is None:
-        nsamp = ly if nrecs > 1 else 0
+        nsamp = ly
 
     # Adjust parameters
-    if nrecs == 1 and nsamp <= 0:
-        nsamp = int(ly / (8 - 7 * overlap / 100))
-    if nfft < nsamp:
-        nfft = 2 ** int(np.ceil(np.log2(nsamp)))
-
+    overlap = np.clip(overlap, 0, 99)
     overlap = int(nsamp * overlap / 100)
     nadvance = nsamp - overlap
-    nrecs = int((ly * nrecs - overlap) / nadvance)
+    nrecs = int((ly - overlap) / nadvance)
+
+    if nfft < nsamp:
+        nfft = 2 ** int(np.ceil(np.log2(nsamp)))
 
     # Create window
     if window is None:
@@ -63,27 +68,45 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
 
     # Initialize arrays
     bic = np.zeros((nfft, nfft), dtype=complex)
+    Pww = np.zeros(nfft)
+    Pxx = np.zeros(nfft)
     Pyy = np.zeros(nfft)
+
     mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
     Yf12 = np.zeros((nfft, nfft), dtype=complex)
 
-    # Main loop for bispectrum estimation
+    # Main loop for cross-bispectrum estimation
     for k in range(nrecs):
         ind = slice(k * nadvance, k * nadvance + nsamp)
-        ys = y.flat[ind]
-        ys = (ys - np.mean(ys)) * window
+        ws = w.flat[ind] - np.mean(w.flat[ind])
+        xs = x.flat[ind] - np.mean(x.flat[ind])
+        ys = y.flat[ind] - np.mean(y.flat[ind])
 
+        ws *= window
+        xs *= window
+        ys *= window
+
+        Wf = np.fft.fft(ws, nfft) / nsamp
+        Xf = np.fft.fft(xs, nfft) / nsamp
         Yf = np.fft.fft(ys, nfft) / nsamp
+
+        CWf = np.conj(Wf)
         CYf = np.conj(Yf)
+
+        Pww += np.abs(Wf) ** 2
+        Pxx += np.abs(Xf) ** 2
         Pyy += np.abs(Yf) ** 2
 
         Yf12 = CYf[mask].reshape(nfft, nfft)
-        bic += np.outer(Yf, Yf) * Yf12
+        bic += np.outer(Wf, Xf) * Yf12
 
-    # Normalize and compute bicoherence
+    # Normalize and compute cross-bicoherence
     bic /= nrecs
+    Pww /= nrecs
+    Pxx /= nrecs
     Pyy /= nrecs
-    bic = np.abs(bic) ** 2 / (np.outer(Pyy, Pyy) * Pyy[mask].reshape(nfft, nfft))
+
+    bic = np.abs(bic) ** 2 / (np.outer(Pww, Pxx) * Pyy[mask].reshape(nfft, nfft))
     bic = np.fft.fftshift(bic)
 
     # Compute frequency axis
@@ -92,21 +115,23 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
     return bic, waxis
 
 
-def plot_bicoherence(bic, waxis):
+def plot_cross_bicoherence(bic, waxis, title="Cross-Bicoherence"):
     """
-    Plot the bicoherence estimate.
+    Plot the cross-bicoherence estimate.
 
     Parameters:
     -----------
     bic : ndarray
-        Bicoherence estimate from the bicoherence function.
+        Cross-bicoherence estimate from the bicoherencex function.
     waxis : ndarray
-        Frequency axis from the bicoherence function.
+        Frequency axis from the bicoherencex function.
+    title : str, optional
+        Title for the plot.
     """
     plt.figure(figsize=(10, 8))
     cont = plt.contourf(waxis, waxis, bic, 100, cmap=plt.cm.Spectral_r)
     plt.colorbar(cont)
-    plt.title("Bicoherence estimated via the direct (FFT) method")
+    plt.title(title)
     plt.xlabel("f1")
     plt.ylabel("f2")
 
@@ -123,22 +148,3 @@ def plot_bicoherence(bic, waxis):
     )
 
     plt.show()
-
-
-def test_bicoherence():
-    """
-    Test function for bicoherence estimation.
-    """
-    # Generate a simple test signal
-    t = np.linspace(0, 10, 1000)
-    f1, f2 = 5, 10
-    y = np.sin(2 * np.pi * f1 * t) + np.sin(2 * np.pi * f2 * t) + 0.5 * np.sin(2 * np.pi * (f1 + f2) * t)
-    y += 0.1 * np.random.randn(len(t))
-
-    # Compute and plot bicoherence
-    bic, waxis = bicoherence(y, nfft=256, nsamp=256)
-    plot_bicoherence(bic, waxis)
-
-
-if __name__ == "__main__":
-    test_bicoherence()
