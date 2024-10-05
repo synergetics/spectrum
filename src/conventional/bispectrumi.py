@@ -1,151 +1,198 @@
-#!/usr/bin/env python
-
-from __future__ import division
 import numpy as np
-from scipy.linalg import hankel
-from scipy.signal import convolve2d
-import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from ..tools import *
 
-np.set_printoptions(linewidth=120)
+def bispectrumi(y, nlag=None, nsamp=None, overlap=0, flag="biased", nfft=None, wind="parzen"):
+    """
+    Estimate bispectrum using the indirect method.
 
-def bispectrumi(y, nlag=None, nsamp=None, overlap=None,
-  flag='biased', nfft=None, wind=None):
-  """
-  Parameters:
-    y       - data vector or time-series
-    nlag    - number of lags to compute [must be specified]
-    segsamp - samples per segment    [default: row dimension of y]
-    overlap - percentage overlap     [default = 0]
-    flag    - 'biased' or 'unbiased' [default is 'unbiased']
-    nfft    - FFT length to use      [default = 128]
-    wind    - window function to apply:
-              if wind=0, the Parzen window is applied (default)
-              otherwise the hexagonal window with unity values is applied.
+    Parameters:
+    -----------
+    y : array_like
+        Input data vector or time-series.
+    nlag : int, optional
+        Number of lags to compute. Must be specified.
+    nsamp : int, optional
+        Samples per segment. If None, uses the entire data length.
+    overlap : int, optional
+        Percentage overlap of segments (0-99).
+    flag : str, optional
+        'biased' or 'unbiased'. Default is 'biased'.
+    nfft : int, optional
+        FFT length to use. If None, uses 128 or next power of 2 > 2*nlag+1.
+    wind : str or int, optional
+        Window function to apply:
+        If 'parzen', the Parzen window is applied (default).
+        If 0, a rectangular window is applied.
+        If int > 0, a Parzen window of that length is applied.
 
-  Output:
-    Bspec   - estimated bispectrum  it is an nfft x nfft array
-              with origin at the center, and axes pointing down and to the right
-    waxis   - frequency-domain axis associated with the bispectrum.
-            - the i-th row (or column) of Bspec corresponds to f1 (or f2)
-              value of waxis(i).
-  """
+    Returns:
+    --------
+    Bspec : ndarray
+        Estimated bispectrum: an nfft x nfft array, with origin
+        at the center, and axes pointing down and to the right.
+    waxis : ndarray
+        Vector of frequencies associated with the rows and columns of Bspec.
+    """
+    # Ensure input is a numpy array
+    y = np.asarray(y)
+    if y.ndim == 1:
+        y = y.reshape(1, -1)
+    ly, nrecs = y.shape
 
-  (ly, nrecs) = y.shape
-  if ly == 1:
-    y = y.reshape(1,-1)
-    ly = nrecs
-    nrecs = 1
+    # Check and set parameters
+    if nlag is None:
+        raise ValueError("nlag must be specified")
+    if nsamp is None or nsamp > ly:
+        nsamp = ly
+    if nfft is None:
+        nfft = max(128, 2 ** int(np.ceil(np.log2(2 * nlag + 1))))
+    overlap = np.clip(overlap, 0, 99)
+    if nrecs > 1:
+        overlap = 0
 
-  if not overlap: overlap = 0
-  overlap = min(99, max(overlap,0))
-  if nrecs > 1: overlap = 0
-  if not nsamp: nsamp = ly
-  if nsamp > ly or nsamp <= 0: nsamp = ly
-  if not 'flag': flag = 'biased'
-  if not nfft: nfft = 128
-  if not wind: wind = 0
+    # Adjust parameters
+    nlag = min(nlag, nsamp - 1)
+    overlap = int(nsamp * overlap / 100)
+    nadvance = nsamp - overlap
+    nrecord = int((ly * nrecs - overlap) / nadvance)
 
-  nlag = min(nlag, nsamp-1)
-  if nfft < 2*nlag+1:
-    nfft = 2^nextpow2(nsamp)
+    # Create the lag window
+    if isinstance(wind, str) and wind.lower() == "parzen":
+        window = parzen_window(nlag)
+    elif wind == 0:
+        window = np.ones(nlag + 1)
+    elif isinstance(wind, int) and wind > 0:
+        window = parzen_window(wind)
+    else:
+        raise ValueError("Invalid window specification")
 
+    window = np.concatenate((window, np.zeros(nlag)))
 
-  # create the lag window
-  Bspec = np.zeros([nfft, nfft])
-  if wind == 0:
-    indx = np.array([range(1,nlag+1)]).T
-    window = make_arr((1, np.sin(np.pi*indx/nlag) / (np.pi*indx/nlag)), axis=0)
-  else:
-    window = np.ones([nlag+1,1])
-  window = make_arr((window, np.zeros([nlag,1])), axis=0)
+    # Initialize arrays
+    c3 = np.zeros((nlag + 1, nlag + 1))
+    y = y.ravel()
 
-  # cumulants in non-redundant region
-  overlap  = np.fix(nsamp * overlap / 100)
-  nadvance = nsamp - overlap
-  nrecord  = np.fix((ly*nrecs - overlap) / nadvance)
+    # Estimate third-order cumulants
+    for k in range(nrecord):
+        index = slice(k * nadvance, k * nadvance + nsamp)
+        x = y[index] - np.mean(y[index])
 
-  c3 = np.zeros([nlag+1,nlag+1])
-  ind = np.arange(nsamp)
-  y = y.ravel(order='F')
+        for j in range(nlag + 1):
+            z = x[: nsamp - j] * x[j:nsamp]
+            for i in range(j, nlag + 1):
+                sum_value = np.dot(z[: nsamp - i], x[i:nsamp])
+                if flag == "biased":
+                    c3[i, j] += sum_value / nsamp
+                else:
+                    c3[i, j] += sum_value / (nsamp - i)
 
-  s = 0
-  for k in xrange(nrecord):
-    x = y[ind].ravel(order='F')
-    x = x - np.mean(x)
-    ind = ind + int(nadvance)
+    c3 /= nrecord
 
-    for j in xrange(nlag+1):
-      z = x[range(nsamp-j)] * x[range(j, nsamp)]
-      for i in xrange(j,nlag+1):
-        Sum = np.dot(z[range(nsamp-i)].T, x[range(i,nsamp)])
-        if flag == 'biased': Sum = Sum/nsamp
-        else: Sum = Sum / (nsamp-i)
-        c3[i,j] = c3[i,j] + Sum
+    # Complete the cumulant array by symmetry
+    c3 += np.tril(c3, -1).T
+    c31 = c3[1:, 1:]
+    c32 = np.zeros((nlag, nlag))
+    c33 = np.zeros((nlag, nlag))
+    c34 = np.zeros((nlag, nlag))
 
-  c3 = c3 / nrecord
+    for i in range(nlag):
+        c32[nlag - 1 - i, : nlag - i] = c31[i:nlag, i]
+        c34[: nlag - i, nlag - 1 - i] = c31[i:nlag, i]
+        if i < nlag - 1:
+            x = np.flipud(c31[i + 1 : nlag, i])
+            c33 += np.diag(x, i + 1) + np.diag(x, -(i + 1))
 
-  # cumulants elsewhere by symmetry
-  c3 = c3 + np.tril(c3,-1).T   # complete I quadrant
-  c31 = c3[1:nlag+1, 1:nlag+1]
-  c32 = np.zeros([nlag, nlag])
-  c33 = np.zeros([nlag, nlag])
-  c34 = np.zeros([nlag, nlag])
-  for i in xrange(nlag):
-    x = c31[i:nlag, i]
-    c32[nlag-1-i,0:nlag-i] = x.T
-    c34[0:nlag-i, nlag-1-i] = x
-    if i+1 < nlag:
-      x = np.flipud(x[1:len(x)])
-      c33 = c33 + np.diag(x,i+1) + np.diag(x,-(i+1))
+    c33 += np.diag(c3[0, nlag:0:-1])
 
-  c33  = c33 + np.diag(c3[0, nlag:0:-1])
+    cmat = np.block([[c33, c32, np.zeros((nlag, 1))], [c34, c3]])
 
-  cmat = make_arr(
-    (make_arr((c33, c32, np.zeros([nlag,1])), axis=1),
-    make_arr((make_arr((c34, np.zeros([1,nlag])), axis=0), c3), axis=1)),
-    axis=0
-  )
+    # Apply lag window
+    if wind != 0:
+        ind = np.arange(-nlag, nlag + 1)
+        window_2d = np.outer(window, window) * window[np.abs(ind)]
+        cmat *= window_2d
 
-  # apply lag-domain window
-  wcmat = cmat
-  if wind != -1:
-    indx = np.arange(-1*nlag, nlag+1).T
-    window = window.reshape(-1,1)
-    for k in xrange(-nlag, nlag+1):
-      wcmat[:, k+nlag] = (cmat[:, k+nlag].reshape(-1,1) * \
-              window[abs(indx-k)] * \
-              window[abs(indx)] * \
-              window[abs(k)]).reshape(-1,)
+    # Compute 2D FFT and shift
+    Bspec = np.fft.fft2(cmat, (nfft, nfft))
+    Bspec = np.fft.fftshift(Bspec)
 
+    # Compute frequency axis
+    waxis = np.fft.fftshift(np.fft.fftfreq(nfft))
 
-  # compute 2d-fft, and shift and rotate for proper orientation
-  Bspec = np.fft.fft2(wcmat, (nfft, nfft))
-  Bspec = np.fft.fftshift(Bspec) # axes d and r; orig at ctr
-
-
-  if nfft%2 == 0:
-    waxis = np.transpose(np.arange(-1*nfft/2, nfft/2)) / nfft
-  else:
-    waxis = np.transpose(np.arange(-1*(nfft-1)/2, (nfft-1)/2+1)) / nfft
-
-  cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap=plt.cm.Spectral_r)
-  plt.colorbar(cont)
-  plt.title('Bispectrum estimated via the indirect method')
-  plt.xlabel('f1')
-  plt.ylabel('f2')
-  plt.show()
-
-  return (Bspec, waxis)
+    return Bspec, waxis
 
 
-def test():
-  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
-  dbic = bispectrumi(qpc['zmat'],  21, 64, 0, 'unbiased', 128, 1)
+def parzen_window(n):
+    """
+    Create a Parzen window of length n+1.
+    """
+    n = int(n)
+    if n % 2 == 0:
+        n += 1  # Make sure n is odd
+
+    window = np.zeros(n)
+    m = (n - 1) / 2
+
+    for k in range(int(m) + 1):
+        if k <= m / 2:
+            window[k] = 1 - 6 * (k / m) ** 2 * (1 - k / m)
+        else:
+            window[k] = 2 * (1 - k / m) ** 3
+
+    window[int(m) + 1 :] = window[int(m) - 1 :: -1]
+    return window
 
 
-if __name__ == '__main__':
-  test()
+def plot_bispectrum(Bspec, waxis, title="Bispectrum (Indirect Method)"):
+    """
+    Plot the bispectrum estimate.
 
+    Parameters:
+    -----------
+    Bspec : ndarray
+        Bispectrum estimate from the bispectrumi function.
+    waxis : ndarray
+        Frequency axis from the bispectrumi function.
+    title : str, optional
+        Title for the plot.
+    """
+    plt.figure(figsize=(10, 8))
+    cont = plt.contourf(waxis, waxis, np.abs(Bspec), 100, cmap=plt.cm.Spectral_r)
+    plt.colorbar(cont)
+    plt.title(title)
+    plt.xlabel("f1")
+    plt.ylabel("f2")
+
+    # Find and annotate maximum
+    max_val = np.max(np.abs(Bspec))
+    max_idx = np.unravel_index(np.argmax(np.abs(Bspec)), Bspec.shape)
+    plt.plot(waxis[max_idx[1]], waxis[max_idx[0]], "r*", markersize=15)
+    plt.annotate(
+        f"Max: {max_val:.3f}",
+        xy=(waxis[max_idx[1]], waxis[max_idx[0]]),
+        xytext=(10, 10),
+        textcoords="offset points",
+        color="red",
+    )
+
+    plt.show()
+
+
+def test_bispectrumi():
+    """
+    Test function for bispectrum estimation using the indirect method.
+    """
+    # Generate a simple test signal
+    t = np.linspace(0, 10, 1000)
+    f1, f2 = 5, 10
+    y = np.sin(2 * np.pi * f1 * t) + np.sin(2 * np.pi * f2 * t) + 0.5 * np.sin(2 * np.pi * (f1 + f2) * t)
+    y += 0.1 * np.random.randn(len(t))
+
+    # Compute and plot bispectrum
+    Bspec, waxis = bispectrumi(y, nlag=50, nsamp=1000, nfft=256)
+    plot_bispectrum(Bspec, waxis)
+
+
+if __name__ == "__main__":
+    test_bispectrumi()

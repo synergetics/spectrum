@@ -1,112 +1,140 @@
-#!/usr/bin/env python
-
-from __future__ import division
 import numpy as np
-from scipy.linalg import hankel
-import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from ..tools import *
+
+def cum3x(x, y, z, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0):
+    """
+    Estimate the third-order cross-cumulants of three time series.
+
+    Parameters:
+    -----------
+    x, y, z : array_like
+        Input data vectors or time-series.
+    maxlag : int, optional
+        Maximum lag to be computed. Default is 0.
+    nsamp : int, optional
+        Samples per segment. If None, nsamp is set to min(len(x), len(y), len(z)).
+    overlap : int, optional
+        Percentage overlap of segments (0-99). Default is 0.
+    flag : str, optional
+        'biased' or 'unbiased'. Default is 'biased'.
+    k1 : int, optional
+        The fixed lag in C_xyz(m,k1). Default is 0.
+
+    Returns:
+    --------
+    y_cum : ndarray
+        Estimated third-order cross-cumulant,
+        C_xyz(m,k1) for -maxlag <= m <= maxlag
+    """
+    x = np.asarray(x).squeeze()
+    y = np.asarray(y).squeeze()
+    z = np.asarray(z).squeeze()
+
+    # Check input dimensions
+    if x.ndim != 1 or y.ndim != 1 or z.ndim != 1:
+        raise ValueError("Input time series must be 1-D arrays.")
+
+    if len(x) != len(y) or len(x) != len(z):
+        raise ValueError("Input time series must have the same length.")
+
+    N = len(x)
+
+    if nsamp is None or nsamp > N:
+        nsamp = N
+
+    overlap = np.clip(overlap, 0, 99)
+    nadvance = nsamp - int(overlap / 100 * nsamp)
+
+    nrecs = int((N - nsamp) / nadvance) + 1
+
+    y_cum = np.zeros(2 * maxlag + 1)
+
+    # Compute third-order cross-cumulants
+    for i in range(nrecs):
+        ind = slice(i * nadvance, i * nadvance + nsamp)
+        xs = x[ind] - np.mean(x[ind])
+        ys = y[ind] - np.mean(y[ind])
+        zs = z[ind] - np.mean(z[ind])
+
+        cx = np.conj(xs)
+
+        # Create the "IV" vector
+        if k1 >= 0:
+            iv = cx[:-k1] * ys[k1:]
+            ind1 = np.arange(nsamp - k1)
+        else:
+            iv = cx[-k1:] * ys[:k1]
+            ind1 = np.arange(-k1, nsamp)
+
+        y_cum[maxlag] += np.dot(iv, zs[ind1])
+
+        for k in range(1, maxlag + 1):
+            y_cum[maxlag + k] += np.dot(iv[k:], zs[ind1[:-k]])
+            y_cum[maxlag - k] += np.dot(iv[:-k], zs[ind1[k:]])
+
+    # Normalize
+    if flag == "biased":
+        y_cum = y_cum / (nsamp * nrecs)
+    else:  # 'unbiased'
+        lsamp = nsamp - abs(k1)
+        y_cum = y_cum / (nrecs * (lsamp - np.abs(np.arange(-maxlag, maxlag + 1))))
+
+    return y_cum
 
 
-def cum3x(x, y, z, maxlag=0, nsamp=0, overlap=0, flag='biased', k1=0):
-  """
-  Third-order cross-cumulants.
-  Parameters:
-      x,y,z  - data vectors/matrices with identical dimensions
-               if x,y,z are matrices, rather than vectors, columns are
-               assumed to correspond to independent realizations,
-               overlap is set to 0, and samp_seg to the row dimension.
-      maxlag - maximum lag to be computed    [default = 0]
-    samp_seg - samples per segment  [default = data_length]
-     overlap - percentage overlap of segments [default = 0]
-               overlap is clipped to the allowed range of [0,99].
-       flag : 'biased', biased estimates are computed  [default]
-              'unbiased', unbiased estimates are computed.
-          k1: the fixed lag in c3(m,k1): defaults to 0
+def plot_third_order_cross_cumulant(lags, cumulant, k1, title="Third-Order Cross-Cumulant"):
+    """
+    Plot the third-order cross-cumulant function.
 
-  Output:
-       y_cum:  estimated third-order cross cumulant,
-               E x^*(n)y(n+m)z(n+k1),   -maxlag <= m <= maxlag
-  """
-
-  (lx, nrecs) = x.shape
-  if (lx, nrecs) != y.shape or (lx, nrecs) != z.shape:
-    raise ValueError('x,y,z should have identical dimensions')
-
-  if lx == 1:
-    lx = nrecs
-    nrecs = 1
-
-  if maxlag < 0: raise ValueError('"maxlag" must be non-negative')
-  if nrecs > 1: nsamp = lx
-  if nsamp <= 0 or nsamp > lx: nsamp = lx
-  if nrecs > 1: overlap = 0
-  overlap = max(0,min(overlap,99))
-
-  overlap  = np.fix(overlap/100 * nsamp)
-  nadvance = nsamp - overlap
-
-  if nrecs == 1:
-    nrecs  = np.fix((lx - overlap)/nadvance)
-
-  nlags = 2*maxlag+1
-  zlag = maxlag
-  y_cum = np.zeros([nlags,1])
-
-  if flag == 'biased':
-    scale = np.ones([nlags, 1]) / nsamp
-  else:
-    lsamp = lx - abs(k1)
-    scale = make_arr((range(lsamp-maxlag, lsamp+1), range(lsamp-1, lsamp-maxlag-1, -1)), axis=1).T
-    scale = np.ones([2*maxlag+1, 1]) / scale
+    Parameters:
+    -----------
+    lags : array_like
+        Lag values.
+    cumulant : array_like
+        Third-order cross-cumulant values.
+    k1 : int
+        The fixed lag value.
+    title : str, optional
+        Title for the plot.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.plot(lags, cumulant, "b-")
+    plt.title(f"{title} (k1 = {k1})")
+    plt.xlabel("Lag m")
+    plt.ylabel("C_xyz(m,k1)")
+    plt.grid(True)
+    plt.axhline(y=0, color="r", linestyle="--")
+    plt.show()
 
 
-  if k1 >= 0:
-    indx = np.arange(nsamp-k1).T
-    indz = np.arange(k1, nsamp).T
-  else:
-    indx = np.arange(-k1, nsamp).T
-    indz = np.arange(nsamp+k1)
+def test_cum3x():
+    """
+    Test function for third-order cross-cumulant estimation.
+    """
+    # Generate test signals: three related non-Gaussian processes
+    N = 10000
+    np.random.seed(0)
+    e = np.random.randn(N) ** 3  # Non-Gaussian noise
+    x = np.zeros(N)
+    y = np.zeros(N)
+    z = np.zeros(N)
+    for t in range(1, N):
+        x[t] = 0.5 * x[t - 1] + e[t]
+        y[t] = 0.3 * y[t - 1] + 0.4 * x[t - 1] + 0.5 * e[t]
+        z[t] = 0.4 * z[t - 1] + 0.3 * x[t - 2] + 0.2 * y[t - 1] + 0.3 * e[t]
 
-  ind = np.arange(nsamp)
+    # Estimate third-order cross-cumulants
+    maxlag = 20
+    k1_values = [0, 5, -5]
 
-  for k in xrange(nrecs):
-    xs = x[ind]
-    xs = xs - np.mean(xs)
-    ys = y[ind]
-    ys = ys - np.mean(ys)
-    zs = z[ind]
-    zs = zs - np.mean(zs)
-    zs = np.conj(zs)
+    for k1 in k1_values:
+        y_cum = cum3x(x, y, z, maxlag=maxlag, nsamp=N, flag="unbiased", k1=k1)
 
-    u = np.zeros([nsamp, 1])
-    u[indx] = xs[indx] * zs[indz]
-
-    y_cum[zlag] = y_cum[zlag] + np.dot(u.T, ys)
-
-    for m in xrange(1, maxlag+1):
-      y_cum[zlag-m] = y_cum[zlag-m] + np.dot(u[m:nsamp].T, ys[0:nsamp-m])
-      y_cum[zlag+m] = y_cum[zlag+m] + np.dot(u[0:nsamp-m].T, ys[m:nsamp])
-
-    ind = ind + int(nadvance)
-
-  y_cum = y_cum * scale / nrecs
-
-  return y_cum
+        # Plot results
+        lags = np.arange(-maxlag, maxlag + 1)
+        plot_third_order_cross_cumulant(lags, y_cum, k1, title="Estimated Third-Order Cross-Cumulant")
 
 
-def test():
-  y = sio.loadmat(here(__file__) + '/demo/ma1.mat')['y']
-
-  # The right results are:
-  #           "biased": [0.36338   0.42762   0.77703   0.84322   0.73021  -0.13123  -0.40743]
-  #           "unbiased": [0.035591   0.041841   0.075956   0.082345   0.071379  -0.012840  -0.039905]
-  print cum3x(y, y, y, 3, 100, 0, "biased")
-  print cum3x(y, y, y, 3, 100, 0, "unbiased")
-
-
-if __name__ == '__main__':
-  test()
-
-
+if __name__ == "__main__":
+    test_cum3x()

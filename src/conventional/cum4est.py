@@ -1,118 +1,159 @@
-#!/usr/bin/env python
-
-from __future__ import division
 import numpy as np
-from scipy.linalg import hankel
-import scipy.io as sio
 import matplotlib.pyplot as plt
-
-from ..tools import *
-from cum2est import *
-from cum2x import *
+from scipy.linalg import hankel
 
 
-def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag='biased', k1=0, k2=0):
-  """
-  CUM4EST Fourth-order cumulants.
-  Parameters:
-          Should be invoked via CUMEST for proper parameter checks
-          y_cum = cum4est (y, maxlag, samp_seg, overlap, flag, k1, k2)
-          Computes sample estimates of fourth-order cumulants
-          via the overlapped segment method.
-          y_cum = cum4est (y, maxlag, samp_seg, overlap, flag, k1, k2)
-                 y: input data vector (column)
-            maxlag: maximum lag
-          samp_seg: samples per segment
-           overlap: percentage overlap of segments
-             flag : 'biased', biased estimates are computed
-                  : 'unbiased', unbiased estimates are computed.
-      k1,k2 : the fixed lags in C3(m,k1) or C4(m,k1,k2)
+def cum4est(y, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0, k2=0):
+    """
+    Estimate the fourth-order cumulants of a time series.
 
-  Output:
-      y_cum : estimated fourth-order cumulant slice
-              C4(m,k1,k2)  -maxlag <= m <= maxlag
-  """
+    Parameters:
+    -----------
+    y : array_like
+        Input data vector or time-series.
+    maxlag : int, optional
+        Maximum lag to be computed. Default is 0.
+    nsamp : int, optional
+        Samples per segment. If None, nsamp is set to len(y).
+    overlap : int, optional
+        Percentage overlap of segments (0-99). Default is 0.
+    flag : str, optional
+        'biased' or 'unbiased'. Default is 'biased'.
+    k1, k2 : int, optional
+        The fixed lags in C4(m,k1,k2). Default is 0.
 
-  (n1, n2) = shape(y, 2)
-  N = n1*n2
-  overlap0 = overlap
-  overlap = np.fix(overlap/100 * nsamp)
-  nrecord = np.fix((N - overlap)/(nsamp - overlap))
-  nadvance = nsamp - overlap
+    Returns:
+    --------
+    y_cum : ndarray
+        Estimated fourth-order cumulant,
+        C4(m,k1,k2) for -maxlag <= m <= maxlag
+    """
+    y = np.asarray(y).squeeze()
 
-  # scale factors for unbiased estimates
-  nlags = 2 * maxlag + 1
-  zlag  = maxlag
-  tmp   = np.zeros([nlags,1])
-  if flag == 'biased':
-    scale = np.ones([nlags,1])/nsamp
-  else:
-    ind = np.arange(-maxlag, maxlag+1).T
-    kmin = min(0, min(k1, k2))
-    kmax  = max(0,max(k1, k2))
-    scale = nsamp - np.maximum(ind, kmax) + np.minimum(ind, kmin)
-    scale = np.ones(nlags) / scale
-    scale = scale.reshape(-1,1)
+    # Check input dimensions
+    if y.ndim != 1:
+        raise ValueError("Input time series must be a 1-D array.")
 
-  mlag  = maxlag + max(abs(k1), abs(k2))
-  mlag  = max(mlag, abs(k1-k2) )
-  mlag1 = mlag + 1
-  nlag  = maxlag
-  m2k2  = np.zeros([2*maxlag+1,1])
+    N = len(y)
 
-  if np.any(np.any(np.imag(y) != 0)): complex_flag = 1
-  else: complex_flag = 0
+    if nsamp is None or nsamp > N:
+        nsamp = N
 
-  # estimate second- and fourth-order moments combine
-  y_cum  = np.zeros([2*maxlag+1, 1])
-  R_yy   = np.zeros([2*mlag+1, 1])
+    overlap = np.clip(overlap, 0, 99)
+    nadvance = nsamp - int(overlap / 100 * nsamp)
 
-  ind = np.arange(nsamp)
-  for i in xrange(nrecord):
-    tmp = np.zeros([2*maxlag+1, 1])
-    x = y[ind]
-    x = x.ravel(order='F') - np.mean(x)
-    z =  x * 0
-    cx = np.conj(x)
+    nrecs = int((N - nsamp) / nadvance) + 1
 
-    # create the "IV" matrix: offset for second lag
-    if k1 >= 0:
-      z[0:nsamp-k1] = x[0:nsamp-k1] * cx[k1:nsamp]
-    else:
-      z[-k1:nsamp] = x[-k1:nsamp] * cx[0:nsamp+k1]
+    y_cum = np.zeros(2 * maxlag + 1)
 
-    # create the "IV" matrix: offset for third lag
-    if k2 >= 0:
-      z[0:nsamp-k2] = z[0:nsamp-k2] * x[k2:nsamp]
-      z[nsamp-k2:nsamp] = np.zeros([k2, 1])
-    else:
-      z[-k2:nsamp] = z[-k2:nsamp] * x[0:nsamp+k2]
-      z[0:-k2] = np.zeros([-k2, 1])
+    # Compute fourth-order cumulants
+    R_yy = np.zeros(2 * maxlag + 1)
+    M_yy = np.zeros(2 * maxlag + 1)
 
-    tmp[zlag] = tmp[zlag] + np.dot(z.T, x)
+    for i in range(nrecs):
+        ind = slice(i * nadvance, i * nadvance + nsamp)
+        x = y[ind]
+        x = x - np.mean(x)
+        cx = np.conj(x)
 
-    for k in xrange(1, maxlag+1):
-      tmp[zlag-k] = tmp[zlag-k] + np.dot(z[k:nsamp].T, x[0:nsamp-k])
-      tmp[zlag+k] = tmp[zlag+k] + np.dot(z[0:nsamp-k].T, x[k:nsamp])
+        # Create the "IV" vector
+        z = np.zeros_like(x)
+        if k1 >= 0:
+            z[:-k1] = x[:-k1] * cx[k1:]
+        else:
+            z[-k1:] = x[-k1:] * cx[:k1]
 
-    y_cum = y_cum + tmp * scale
+        if k2 >= 0:
+            z[:-k2] *= x[k2:]
+            z[nsamp - k2 :] = 0
+        else:
+            z[-k2:] *= x[:k2]
+            z[:k2] = 0
 
-    R_yy = cum2est(x, mlag, nsamp, overlap0, flag)
-    #  We need E x(t)x(t+tau) stuff also:
-    if complex_flag:
-      M_yy = cum2x(np.conj(x), x, mlag, nsamp, overlap0, flag)
-    else:
-      M_yy = R_yy
+        y_cum[maxlag] += np.dot(z, x)
+        R_yy[maxlag] += np.dot(x, cx)
+        M_yy[maxlag] += np.dot(x, x)
 
-    y_cum = y_cum - \
-            R_yy[mlag1+k1-1] * R_yy[mlag1-k2-nlag-1:mlag1-k2+nlag] - \
-            R_yy[k1-k2+mlag1-1] * R_yy[mlag1-nlag-1:mlag1+nlag] - \
-            M_yy[mlag1+k2-1].T * M_yy[mlag1-k1-nlag-1:mlag1-k1+nlag]
+        for k in range(1, maxlag + 1):
+            y_cum[maxlag + k] += np.dot(z[k:], x[:-k])
+            y_cum[maxlag - k] += np.dot(z[:-k], x[k:])
+            R_yy[maxlag + k] += np.dot(x[k:], cx[:-k])
+            R_yy[maxlag - k] += np.dot(x[:-k], cx[k:])
+            M_yy[maxlag + k] += np.dot(x[k:], x[:-k])
+            M_yy[maxlag - k] += np.dot(x[:-k], x[k:])
 
-    ind = ind + int(nadvance)
+    # Normalize
+    if flag == "biased":
+        scale = np.ones(2 * maxlag + 1) / (nsamp * nrecs)
+    else:  # 'unbiased'
+        lsamp = nsamp - np.maximum(np.abs(np.arange(-maxlag, maxlag + 1)), np.maximum(np.abs(k1), np.abs(k2)))
+        scale = 1 / (nrecs * lsamp)
+
+    y_cum *= scale
+    R_yy *= scale
+    M_yy *= scale
+
+    # Remove second-order statistics
+    y_cum -= (
+        R_yy[maxlag + k1] * R_yy[maxlag - k2 : maxlag - k2 + 2 * maxlag + 1]
+        + R_yy[maxlag + k1 - k2] * R_yy[maxlag - maxlag : maxlag + maxlag + 1]
+        + M_yy[maxlag + k2] * M_yy[maxlag - k1 : maxlag - k1 + 2 * maxlag + 1]
+    )
+
+    return y_cum
 
 
-  y_cum = y_cum / nrecord
+def plot_fourth_order_cumulant(lags, cumulant, k1, k2, title="Fourth-Order Cumulant"):
+    """
+    Plot the fourth-order cumulant function.
 
-  return y_cum
+    Parameters:
+    -----------
+    lags : array_like
+        Lag values.
+    cumulant : array_like
+        Fourth-order cumulant values.
+    k1, k2 : int
+        The fixed lag values.
+    title : str, optional
+        Title for the plot.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.plot(lags, cumulant, "b-")
+    plt.title(f"{title} (k1 = {k1}, k2 = {k2})")
+    plt.xlabel("Lag m")
+    plt.ylabel("C4(m,k1,k2)")
+    plt.grid(True)
+    plt.axhline(y=0, color="r", linestyle="--")
+    plt.show()
 
+
+def test_cum4est():
+    """
+    Test function for fourth-order cumulant estimation.
+    """
+    # Generate a test signal: Non-Gaussian AR(1) process with quadratic nonlinearity
+    N = 10000
+    phi = 0.5
+    np.random.seed(0)
+    e = np.random.randn(N) ** 3  # Non-Gaussian noise
+    y = np.zeros(N)
+    for t in range(1, N):
+        y[t] = phi * y[t - 1] + 0.1 * y[t - 1] ** 2 + e[t]
+
+    # Estimate fourth-order cumulants
+    maxlag = 20
+    k1_k2_values = [(0, 0), (5, 0), (0, 5), (5, 5)]
+
+    for k1, k2 in k1_k2_values:
+        y_cum = cum4est(y, maxlag=maxlag, nsamp=N, flag="unbiased", k1=k1, k2=k2)
+
+        # Plot results
+        lags = np.arange(-maxlag, maxlag + 1)
+        plot_fourth_order_cumulant(
+            lags, y_cum, k1, k2, title="Estimated Fourth-Order Cumulant of Non-Gaussian AR(1) Process"
+        )
+
+
+if __name__ == "__main__":
+    test_cum4est()

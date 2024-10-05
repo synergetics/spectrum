@@ -1,93 +1,124 @@
-#!/usr/bin/env python
-
-from __future__ import division
 import numpy as np
-from scipy.linalg import hankel
-import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from ..tools import *
+
+def cum2x(x, y, maxlag=0, nsamp=None, overlap=0, flag="biased"):
+    """
+    Estimate the cross-covariance between two time series.
+
+    Parameters:
+    -----------
+    x, y : array_like
+        Input data vectors or time-series.
+    maxlag : int, optional
+        Maximum lag to be computed. Default is 0.
+    nsamp : int, optional
+        Samples per segment. If None, nsamp is set to min(len(x), len(y)).
+    overlap : int, optional
+        Percentage overlap of segments (0-99). Default is 0.
+    flag : str, optional
+        'biased' or 'unbiased'. Default is 'biased'.
+
+    Returns:
+    --------
+    y_cum : ndarray
+        Estimated cross-covariance,
+        C_xy(m) for -maxlag <= m <= maxlag
+    """
+    x = np.asarray(x).squeeze()
+    y = np.asarray(y).squeeze()
+
+    # Check input dimensions
+    if x.ndim != 1 or y.ndim != 1:
+        raise ValueError("Input time series must be 1-D arrays.")
+
+    if len(x) != len(y):
+        raise ValueError("Input time series must have the same length.")
+
+    N = len(x)
+
+    if nsamp is None or nsamp > N:
+        nsamp = N
+
+    overlap = np.clip(overlap, 0, 99)
+    nadvance = nsamp - int(overlap / 100 * nsamp)
+
+    nrecs = int((N - nsamp) / nadvance) + 1
+
+    y_cum = np.zeros(2 * maxlag + 1)
+
+    # Compute cross-covariance
+    for k in range(nrecs):
+        ind = slice(k * nadvance, k * nadvance + nsamp)
+        xs = x[ind]
+        ys = y[ind]
+        xs = xs - np.mean(xs)
+        ys = ys - np.mean(ys)
+
+        y_cum[maxlag] += np.dot(xs, ys)
+
+        for m in range(1, maxlag + 1):
+            y_cum[maxlag + m] += np.dot(xs[m:], ys[:-m])
+            y_cum[maxlag - m] += np.dot(xs[:-m], ys[m:])
+
+    # Normalize
+    if flag == "biased":
+        y_cum = y_cum / (nsamp * nrecs)
+    else:  # 'unbiased'
+        y_cum = y_cum / (nrecs * (nsamp - np.abs(np.arange(-maxlag, maxlag + 1))))
+
+    return y_cum
 
 
-def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag='biased'):
-  """
-  Cross-covariance
-  Parameters:
-      x,y    - data vectors/matrices with identical dimensions
-               if x,y are matrices, rather than vectors, columns are
-               assumed to correspond to independent realizations,
-               overlap is set to 0, and samp_seg to the row dimension.
-      maxlag - maximum lag to be computed    [default = 0]
-    samp_seg - samples per segment  [default = data_length]
-     overlap - percentage overlap of segments [default = 0]
-               overlap is clipped to the allowed range of [0,99].
-       flag  - 'biased', biased estimates are computed  [default]
-              'unbiased', unbiased estimates are computed.
+def plot_cross_covariance(lags, ccov, title="Cross-Covariance"):
+    """
+    Plot the cross-covariance function.
 
-  Output:
-       y_cum - estimated cross-covariance
-               E x^*(n)y(n+m),   -maxlag <= m <= maxlag
-  """
-
-  (lx, nrecs) = x.shape
-  if (lx, nrecs) != y.shape:
-    raise ValueError('x,y should have identical dimensions')
-
-  if lx == 1:
-    lx = nrecs
-    nrecs = 1
-
-  if maxlag < 0: raise ValueError('maxlag must be non-negative')
-  if nrecs > 1: nsamp = lx
-  if nsamp <= 0 or nsamp > lx: nsamp = lx
-  if nrecs > 1: overlap = 0
-  overlap = max(0,min(overlap,99))
-
-  overlap = np.fix(overlap/100 * nsamp)
-  nadvance = nsamp - overlap
-  if nrecs == 1:
-    nrecs = np.fix((lx - overlap)/nadvance)
-
-  nlags = 2*maxlag+1
-  zlag  = maxlag
-  y_cum = np.zeros([nlags,1])
-
-  if flag == 'biased':
-    scale = np.ones([nlags, 1])/nsamp
-  else:
-    scale = make_arr((range(lx-maxlag, lx+1), range(lx-1, lx-maxlag-1, -1)), axis=1).T
-    scale = np.ones([2*maxlag+1, 1]) / scale
-
-  ind = np.arange(nsamp).T
-  for k in xrange(nrecs):
-    xs = x[ind].ravel(order='F')
-    xs = xs - np.mean(xs)
-    ys = y[ind].ravel(order='F')
-    ys = ys - np.mean(ys)
-
-    y_cum[zlag] = y_cum[zlag] + np.dot(xs, ys)
-
-    for m in xrange(1, maxlag+1):
-      y_cum[zlag-m] = y_cum[zlag-m] + np.dot(xs[m:nsamp].T, ys[0:nsamp-m])
-      y_cum[zlag+m] = y_cum[zlag+m] + np.dot(xs[0:nsamp-m].T, ys[m:nsamp])
-
-    ind = ind + int(nadvance)
-
-  y_cum = y_cum * scale / nrecs
-
-  return y_cum
+    Parameters:
+    -----------
+    lags : array_like
+        Lag values.
+    ccov : array_like
+        Cross-covariance values.
+    title : str, optional
+        Title for the plot.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.plot(lags, ccov, "b-")
+    plt.title(title)
+    plt.xlabel("Lag")
+    plt.ylabel("Cross-Covariance")
+    plt.grid(True)
+    plt.axhline(y=0, color="r", linestyle="--")
+    plt.show()
 
 
-def test():
-  y = sio.loadmat(here(__file__) + '/demo/ma1.mat')['y']
+def test_cum2x():
+    """
+    Test function for cross-covariance estimation.
+    """
+    # Generate test signals: two correlated AR(1) processes
+    N = 1000
+    phi = 0.5
+    np.random.seed(0)
+    x = np.zeros(N)
+    y = np.zeros(N)
+    for t in range(1, N):
+        x[t] = phi * x[t - 1] + np.random.randn()
+        y[t] = phi * y[t - 1] + 0.5 * x[t] + 0.5 * np.random.randn()
 
-  # The right results are:
-  #           "biased": [--0.25719  -0.12011   0.35908   1.01378   0.35908  -0.12011  -0.25719]
-  #           "unbiased": [-0.025190  -0.011753   0.035101   0.099002   0.035101  -0.011753  -0.025190]
-  print cum2x(y, y, 3, 100, 0, "biased")
-  print cum2x(y, y, 3, 100, 0, "unbiased")
+    # Estimate cross-covariance
+    maxlag = 20
+    ccov = cum2x(x, y, maxlag=maxlag, nsamp=N, flag="unbiased")
+
+    # Plot results
+    lags = np.arange(-maxlag, maxlag + 1)
+    plot_cross_covariance(lags, ccov, title="Estimated Cross-Covariance of Correlated AR(1) Processes")
+
+    # Compute and plot sample cross-correlation function (CCF)
+    ccf = ccov / np.sqrt(np.var(x) * np.var(y))
+    plot_cross_covariance(lags, ccf, title="Sample Cross-Correlation Function (CCF)")
 
 
-if __name__ == '__main__':
-  test()
-
+if __name__ == "__main__":
+    test_cum2x()
