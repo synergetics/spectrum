@@ -7,6 +7,7 @@ from scipy.linalg import hankel
 from scipy.signal import convolve2d
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Tuple, Optional, Union, Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
@@ -16,7 +17,15 @@ np.set_printoptions(linewidth=120)
 log = logging.getLogger(__file__)
 
 
-def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None, wind=None):
+def bispectrumi(
+    y: np.ndarray[Any, np.dtype[Any]],
+    nlag: int = 0,
+    nsamp: int = 0,
+    overlap: int = 0,
+    flag: str = "biased",
+    nfft: int = 128,
+    wind: Optional[Union[int, np.ndarray[Any, np.dtype[Any]]]] = None,
+) -> Tuple[np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]]:
     """
     Parameters:
       y       - data vector or time-series
@@ -43,8 +52,6 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
         ly = nrecs
         nrecs = 1
 
-    if not overlap:
-        overlap = 0
     overlap = min(99, max(overlap, 0))
     if nrecs > 1:
         overlap = 0
@@ -59,7 +66,8 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
     if not wind:
         wind = 0
 
-    nlag = min(nlag, nsamp - 1)
+    if nlag == 0:
+        nlag = min(nlag, nsamp - 1)
     if nfft < 2 * nlag + 1:
         nfft = 2 ^ nextpow2(nsamp)
 
@@ -73,7 +81,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
     window = make_arr((window, np.zeros([nlag, 1])), axis=0)
 
     # cumulants in non-redundant region
-    overlap = np.fix(nsamp * overlap / 100)
+    overlap = np.fix(nsamp * overlap / 100)  # type: ignore
     nadvance = nsamp - overlap
     nrecord = np.fix((ly * nrecs - overlap) / nadvance)
 
@@ -82,7 +90,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
     y = y.ravel(order="F")
 
     s = 0
-    for k in range(nrecord):
+    for k in range(int(nrecord)):
         x = y[ind].ravel(order="F")
         x = x - np.mean(x)
         ind = ind + int(nadvance)
@@ -136,7 +144,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
             )
 
     # compute 2d-fft, and shift and rotate for proper orientation
-    Bspec = np.fft.fft2(wcmat, (nfft, nfft))
+    Bspec = np.fft.fft2(wcmat, (nfft, nfft))  # type: ignore
     Bspec = np.fft.fftshift(Bspec)  # axes d and r; orig at ctr
 
     if nfft % 2 == 0:
@@ -144,7 +152,7 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
     else:
         waxis = np.transpose(np.arange(-1 * (nfft - 1) / 2, (nfft - 1) / 2 + 1)) / nfft
 
-    cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap=plt.cm.Spectral_r)
+    cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap="viridis")
     plt.colorbar(cont)
     plt.title("Bispectrum estimated via the indirect method")
     plt.xlabel("f1")
@@ -152,12 +160,3 @@ def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None
     plt.show()
 
     return (Bspec, waxis)
-
-
-def test():
-    qpc = sio.loadmat(here(__file__) + "/demo/qpc.mat")
-    dbic = bispectrumi(qpc["zmat"], 21, 64, 0, "unbiased", 128, 1)
-
-
-if __name__ == "__main__":
-    test()
