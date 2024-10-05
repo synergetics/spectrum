@@ -3,6 +3,7 @@
 
 import numpy as np
 from scipy.linalg import hankel
+import logging
 import scipy.io as sio
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
@@ -10,14 +11,17 @@ from typing import Tuple, Optional, Any
 from tools import nextpow2, flat_eq, make_arr, shape
 
 
+log = logging.getLogger(__file__)
+
+
 def bicoherencex(
     w: np.ndarray[Any, np.dtype[Any]],
     x: np.ndarray[Any, np.dtype[Any]],
     y: np.ndarray[Any, np.dtype[Any]],
-    nfft: Optional[int] = None,
+    nfft: int = 128,
     wind: Optional[np.ndarray[Any, np.dtype[Any]]] = None,
-    nsamp: Optional[int] = None,
-    overlap: Optional[int] = None,
+    nsamp: int = 0,
+    overlap: int = 50,
 ) -> Tuple[np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]]:
     """
     Direct (FD) method for estimating cross-bicoherence
@@ -96,7 +100,7 @@ def bicoherencex(
     Pww = np.zeros([nfft, 1])
     Pxx = np.zeros([nfft, 1])
 
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))
+    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))  # type: ignore
     Yf12 = np.zeros([nfft, nfft])
     ind = np.transpose(np.arange(nsamp))
     w = w.ravel(order="F")
@@ -142,7 +146,7 @@ def bicoherencex(
     else:
         waxis = np.transpose(np.arange(-1 * (nfft - 1) / 2, (nfft - 1) / 2 + 1)) / nfft
 
-    cont = plt.contourf(waxis, waxis, bic, 100, cmap=plt.cm.Spectral_r)
+    cont = plt.contourf(waxis, waxis, bic, 100, cmap="viridis")
     plt.colorbar(cont)
     plt.title("Bicoherence estimated via the direct (FFT) method")
     plt.xlabel("f1")
@@ -154,12 +158,3 @@ def bicoherencex(
     plt.show()
 
     return (bic, waxis)
-
-
-def test():
-    nl1 = sio.loadmat(here(__file__) + "/demo/nl1.mat")
-    dbic = bicoherencex(nl1["x"], nl1["x"], nl1["y"])
-
-
-if __name__ == "__main__":
-    test()
