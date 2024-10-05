@@ -2,6 +2,7 @@
 
 
 import numpy as np
+import logging
 from scipy.linalg import hankel
 from scipy.signal import convolve2d
 import scipy.io as sio
@@ -10,6 +11,9 @@ import matplotlib.pyplot as plt
 from tools import nextpow2, flat_eq, make_arr, shape
 
 np.set_printoptions(linewidth=120)
+
+
+log = logging.getLogger(__file__)
 
 
 def bispectrumi(y, nlag=None, nsamp=None, overlap=None, flag="biased", nfft=None, wind=None):

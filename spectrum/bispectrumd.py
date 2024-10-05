@@ -51,15 +51,9 @@ def bispectrumd(
     #     ly = nrecs
     #     nrecs = 1
 
-    if not nfft:
-        nfft = 128
-    if not overlap:
-        overlap = 50
     overlap = min(99, max(overlap, 0))
     if nrecs > 1:
         overlap = 0
-    if not nsamp:
-        nsamp = 0
     if nrecs > 1:
         nsamp = ly
     if nrecs == 1 and nsamp <= 0:

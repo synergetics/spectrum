@@ -2,6 +2,7 @@
 
 
 import numpy as np
+import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
@@ -9,6 +10,9 @@ import matplotlib.pyplot as plt
 from tools import nextpow2, flat_eq, make_arr, shape
 from cum2est import *
 from cum2x import *
+
+
+log = logging.getLogger(__file__)
 
 
 def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
