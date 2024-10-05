@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# type: ignore
 
 import numpy as np
 import sys

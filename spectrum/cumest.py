@@ -6,16 +6,26 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any, Optional, Union
 
 from tools import nextpow2, flat_eq, make_arr, shape
-from cum2est import *
-from cum3est import *
-from cum4est import *
+from cum2est import cum2est
+from cum3est import cum3est
+from cum4est import cum4est
 
 log = logging.getLogger(__file__)
 
 
-def cumest(y, norder=2, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0, k2=0):
+def cumest(
+    y: np.ndarray[Any, np.dtype[Any]],
+    norder: int = 2,
+    maxlag: int = 0,
+    nsamp: Optional[int] = None,
+    overlap: int = 0,
+    flag: str = "biased",
+    k1: int = 0,
+    k2: int = 0,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     Second-, third- or fourth-order cumulants.
     Parameters:
@@ -46,7 +56,7 @@ def cumest(y, norder=2, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0, k2
 
     if nrecs > 1:
         nsamp = ksamp
-    if nsamp <= 0 or nsamp > ksamp:
+    if nsamp <= 0 or nsamp > ksamp:  # type: ignore
         nsamp = ksamp
 
     if nrecs > 1:
@@ -62,29 +72,3 @@ def cumest(y, norder=2, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0, k2
         y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1, k2)
 
     return y_cum
-
-
-def test():
-    y = sio.loadmat(here(__file__) + "/demo/ma1.mat")["y"]
-
-    # The right results are:
-    #           "biased": [-0.12250513  0.35963613  1.00586945  0.35963613 -0.12250513]
-    #           "unbiaed": [-0.12444965  0.36246791  1.00586945  0.36246791 -0.12444965]
-    log.info(cum2est(y, 2, 128, 0, "unbiased"))
-    log.info(cum2est(y, 2, 128, 0, "biased"))
-
-    # For the 3rd cumulant:
-    #           "biased": [-0.18203039  0.07751503  0.67113035  0.729953    0.07751503]
-    #           "unbiased": [-0.18639911  0.07874543  0.67641484  0.74153955  0.07937539]
-    log.info(cum3est(y, 2, 128, 0, "biased", 1))
-    log.info(cum3est(y, 2, 128, 0, "unbiased", 1))
-
-    # For testing the 4th-order cumulant
-    # "biased": [-0.03642083  0.4755026   0.6352588   1.38975232  0.83791117  0.41641134 -0.97386322]
-    # "unbiased": [-0.04011388  0.48736793  0.64948927  1.40734633  0.8445089   0.42303979 -0.99724968]
-    log.info(cum4est(y, 3, 128, 0, "biased", 1, 1))
-    log.info(cum4est(y, 3, 128, 0, "unbiased", 1, 1))
-
-
-if __name__ == "__main__":
-    test()

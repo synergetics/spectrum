@@ -6,6 +6,7 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
@@ -13,7 +14,16 @@ from tools import nextpow2, flat_eq, make_arr, shape
 log = logging.getLogger(__file__)
 
 
-def cum3x(x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0):
+def cum3x(
+    x: np.ndarray[Any, np.dtype[Any]],
+    y: np.ndarray[Any, np.dtype[Any]],
+    z: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int = 0,
+    nsamp: int = 0,
+    overlap: int = 0,
+    flag: str = "biased",
+    k1: int = 0,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     Third-order cross-cumulants.
     Parameters:
@@ -52,11 +62,11 @@ def cum3x(x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0):
         overlap = 0
     overlap = max(0, min(overlap, 99))
 
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
 
     if nrecs == 1:
-        nrecs = np.fix((lx - overlap) / nadvance)
+        nrecs = int(np.fix((lx - overlap) / nadvance))
 
     nlags = 2 * maxlag + 1
     zlag = maxlag
@@ -101,17 +111,3 @@ def cum3x(x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0):
     y_cum = y_cum * scale / nrecs
 
     return y_cum
-
-
-def test():
-    y = sio.loadmat(here(__file__) + "/demo/ma1.mat")["y"]
-
-    # The right results are:
-    #           "biased": [0.36338   0.42762   0.77703   0.84322   0.73021  -0.13123  -0.40743]
-    #           "unbiased": [0.035591   0.041841   0.075956   0.082345   0.071379  -0.012840  -0.039905]
-    log.info(cum3x(y, y, y, 3, 100, 0, "biased"))
-    log.info(cum3x(y, y, y, 3, 100, 0, "unbiased"))
-
-
-if __name__ == "__main__":
-    test()

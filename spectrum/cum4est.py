@@ -6,16 +6,25 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any, Optional
 
 from tools import nextpow2, flat_eq, make_arr, shape
-from cum2est import *
-from cum2x import *
+from cum2est import cum2est
+from cum2x import cum2x
 
 
 log = logging.getLogger(__file__)
 
 
-def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
+def cum4est(
+    y: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int = 0,
+    nsamp: int = 0,
+    overlap: int = 0,
+    flag: str = "biased",
+    k1: int = 0,
+    k2: int = 0,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     CUM4EST Fourth-order cumulants.
     Parameters:
@@ -40,8 +49,8 @@ def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
     (n1, n2) = shape(y, 2)
     N = n1 * n2
     overlap0 = overlap
-    overlap = np.fix(overlap / 100 * nsamp)
-    nrecord = np.fix((N - overlap) / (nsamp - overlap))
+    overlap = int(np.fix(overlap / 100 * nsamp))
+    nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 
     # scale factors for unbiased estimates

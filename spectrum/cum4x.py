@@ -6,15 +6,27 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
-from cum2x import *
+from cum2x import cum2x
 
 
 log = logging.getLogger(__file__)
 
 
-def cum4x(w, x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
+def cum4x(
+    w: np.ndarray[Any, np.dtype[Any]],
+    x: np.ndarray[Any, np.dtype[Any]],
+    y: np.ndarray[Any, np.dtype[Any]],
+    z: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int = 0,
+    nsamp: int = 0,
+    overlap: int = 0,
+    flag: str = "biased",
+    k1: int = 0,
+    k2: int = 0,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     Fourth-order cross-cumulants.
     Parameters:
@@ -55,11 +67,11 @@ def cum4x(w, x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
     overlap = max(0, min(overlap, 99))
 
     overlap0 = overlap
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
 
     if nrecs == 1:
-        nrecs = np.fix((lx - overlap) / nadvance)
+        nrecs = int(np.fix((lx - overlap) / nadvance))
 
     # scale factors for unbiased estimates
     nlags = 2 * maxlag + 1
@@ -145,7 +157,7 @@ def cum4x(w, x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
             y_cum
             - R_zy * R_wx * sc12
             - R_wy * R_zx[rind - k2 + maxlag + abs(k2)] * sc1
-            - M_wz.T * M_yx[rind - k1 + maxlag + abs(k1)] * sc2
+            - M_wz.T * M_yx[rind - k1 + maxlag + abs(k1)] * sc2  # type: ignore
         )
 
         ind = ind + int(nadvance)
@@ -153,18 +165,3 @@ def cum4x(w, x, y, z, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
     y_cum = y_cum / nrecs
 
     return y_cum
-
-
-def test():
-
-    y = sio.loadmat(here(__file__) + "/demo/ma1.mat")["y"]
-
-    # The right results are:
-    #           "biased": [-0.52343  -0.43057   1.16651   3.21583   1.98088  -0.38022  -1.05836]
-    #           "unbiased": [-0.53962  -0.43936   1.17829   3.21583   2.00089  -0.38798  -1.09109]
-    log.info(cum4x(y, y, y, y, 3, 100, 0, "biased"))
-    log.info(cum4x(y, y, y, y, 3, 100, 0, "unbiased"))
-
-
-if __name__ == "__main__":
-    test()
