@@ -1,148 +1,131 @@
+#!/usr/bin/env python
+
+from __future__ import division
 import numpy as np
+from scipy.linalg import hankel
+import scipy.io as sio
 import matplotlib.pyplot as plt
-from typing import Tuple, Union, Optional
-import torch
+
+from ..tools import *
 
 
-def bicoherence(
-    y: Union[np.ndarray, torch.Tensor],
-    nfft: Optional[int] = None,
-    window: Optional[Union[np.ndarray, torch.Tensor]] = None,
-    nsamp: Optional[int] = None,
-    overlap: Optional[int] = None,
-) -> Tuple[Union[np.ndarray, torch.Tensor], Union[np.ndarray, torch.Tensor]]:
-    """
-    Direct (FD) method for estimating bicoherence.
+def bicoherence(y, nfft=None, wind=None, nsamp=None, overlap=None):
+  """
+  Direct (FD) method for estimating bicoherence
+  Parameters:
+    y     - data vector or time-series
+    nfft - fft length [default = power of two > segsamp]
+           actual size used is power of two greater than 'nsamp'
+    wind - specifies the time-domain window to be applied to each
+           data segment; should be of length 'segsamp' (see below);
+      otherwise, the default Hanning window is used.
+    segsamp - samples per segment [default: such that we have 8 segments]
+            - if x is a matrix, segsamp is set to the number of rows
+    overlap - percentage overlap, allowed range [0,99]. [default = 50];
+            - if x is a matrix, overlap is set to 0.
 
-    Parameters:
-    -----------
-    y : array_like
-        Input data vector or time-series.
-    nfft : int, optional
-        FFT length. If None, uses the next power of two > nsamp.
-    window : array_like, optional
-        Time-domain window to be applied to each data segment.
-        If None, a Hanning window is used.
-    nsamp : int, optional
-        Samples per segment. If None, uses 8 segments.
-    overlap : int, optional
-        Percentage overlap of segments (0-99). If None, uses 50%.
+  Output:
+    bic     - estimated bicoherence: an nfft x nfft array, with origin
+              at the center, and axes pointing down and to the right.
+    waxis   - vector of frequencies associated with the rows and columns
+              of bic;  sampling frequency is assumed to be 1.
+  """
 
-    Returns:
-    --------
-    bic : ndarray
-        Estimated bicoherence: an nfft x nfft array, with origin
-        at the center, and axes pointing down and to the right.
-    waxis : ndarray
-        Vector of frequencies associated with the rows and columns of bic.
-    """
-    # Determine if we're using PyTorch
-    use_torch = isinstance(y, torch.Tensor)
+  # Parameter checks
 
-    # Use the appropriate library
-    lib = torch if use_torch else np
+  (ly, nrecs) = y.shape
+  if ly == 1:
+    y = y.reshape(1, -1)
+    ly = nrecs
+    nrecs = 1
 
-    # Reshape input if necessary
-    y = lib.asarray(y)
-    if y.ndim == 1:
-        y = y.reshape(1, -1)
-    ly, nrecs = y.shape
+  if not nfft: nfft = 128
+  if not overlap: overlap = 50
+  if nrecs > 1: overlap = 0
+  if not nsamp: nsamp = 0
+  if nrecs > 1: nsamp = ly
 
-    # Set default parameters
-    if nfft is None:
-        nfft = 128
-    if overlap is None:
-        overlap = 50 if nrecs == 1 else 0
-    if nsamp is None:
-        nsamp = ly if nrecs > 1 else 0
+  if nrecs > 1 and nsamp <= 0:
+    nsamp = np.fix(ly / (8 - 7 * overlap/100))
+  if nfft  < nsamp:
+    nfft = 2**nextpow2(nsamp)
 
-    # Adjust parameters
-    if nrecs == 1 and nsamp <= 0:
-        nsamp = int(ly / (8 - 7 * overlap / 100))
-    if nfft < nsamp:
-        nfft = 2 ** int(lib.ceil(lib.log2(lib.tensor(nsamp) if use_torch else nsamp)))
-
-    overlap = int(nsamp * overlap / 100)
-    nadvance = nsamp - overlap
-    nrecs = int((ly * nrecs - overlap) / nadvance)
-
-    # Create window
-    if window is None:
-        window = lib.hann(nsamp) if use_torch else np.hanning(nsamp)
-    window = lib.asarray(window).ravel()
-
-    if len(window) != nsamp:
-        raise ValueError(f"Window length ({len(window)}) must match nsamp ({nsamp})")
-
-    # Initialize arrays
-    bic = lib.zeros((nfft, nfft), dtype=complex)
-    Pyy = lib.zeros(nfft)
-    mask = (
-        lib.tensor(hankel(lib.arange(nfft), lib.array([nfft - 1] + list(range(nfft - 1)))))
-        if use_torch
-        else hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
-    )
-    Yf12 = lib.zeros((nfft, nfft), dtype=complex)
-
-    # Main loop for bispectrum estimation
-    for k in range(nrecs):
-        ind = slice(k * nadvance, k * nadvance + nsamp)
-        ys = y.flatten()[ind]
-        ys = (ys - lib.mean(ys)) * window
-
-        Yf = lib.fft.fft(ys, nfft) / nsamp
-        CYf = lib.conj(Yf)
-        Pyy += lib.abs(Yf) ** 2
-
-        Yf12 = CYf[mask].reshape(nfft, nfft)
-        bic += lib.outer(Yf, Yf) * Yf12
-
-    # Normalize and compute bicoherence
-    bic /= nrecs
-    Pyy /= nrecs
-    bic = lib.abs(bic) ** 2 / (lib.outer(Pyy, Pyy) * Pyy[mask].reshape(nfft, nfft))
-    bic = lib.fft.fftshift(bic)
-
-    # Compute frequency axis
-    waxis = lib.fft.fftshift(lib.fft.fftfreq(nfft))
-
-    return bic, waxis
+  overlap  = np.fix(nsamp * overlap/100)
+  nadvance = nsamp - overlap
+  nrecs    = np.fix ((ly*nrecs - overlap) / nadvance)
 
 
-def plot_bicoherence(bic: Union[np.ndarray, torch.Tensor], waxis: Union[np.ndarray, torch.Tensor]) -> None:
-    """
-    Plot the bicoherence estimate.
+  if not wind:
+    wind = np.hanning(nsamp)
 
-    Parameters:
-    -----------
-    bic : ndarray
-        Bicoherence estimate from the bicoherence function.
-    waxis : ndarray
-        Frequency axis from the bicoherence function.
-    """
-    # Convert to numpy if tensors
-    if isinstance(bic, torch.Tensor):
-        bic = bic.cpu().numpy()
-    if isinstance(waxis, torch.Tensor):
-        waxis = waxis.cpu().numpy()
+  try:
+    (rw, cw) = wind.shape
+  except ValueError:
+    (rw,) = wind.shape
+    cw = 1
 
-    plt.figure(figsize=(10, 8))
-    cont = plt.contourf(waxis, waxis, bic, 100, cmap=plt.cm.Spectral_r)
-    plt.colorbar(cont)
-    plt.title("Bicoherence estimated via the direct (FFT) method")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
+  if min(rw, cw) == 1 or max(rw, cw) == nsamp:
+    print "Segment size is " + str(nsamp)
+    print "Wind array is " + str(rw) + " by " + str(cw)
+    print "Using default Hanning window"
+    wind = np.hanning(nsamp)
 
-    # Find and annotate maximum
-    max_val = np.max(bic)
-    max_idx = np.unravel_index(np.argmax(bic), bic.shape)
-    plt.plot(waxis[max_idx[1]], waxis[max_idx[0]], "r*", markersize=15)
-    plt.annotate(
-        f"Max: {max_val:.3f}",
-        xy=(waxis[max_idx[1]], waxis[max_idx[0]]),
-        xytext=(10, 10),
-        textcoords="offset points",
-        color="red",
-    )
+  wind = wind.reshape(1,-1)
 
-    plt.show()
+
+  # Accumulate triple products
+
+  bic = np.zeros([nfft, nfft])
+  Pyy  = np.zeros([nfft,1])
+
+  mask = hankel(np.arange(nfft),np.array([nfft-1]+range(nfft-1)))
+  Yf12 = np.zeros([nfft,nfft])
+  ind  = np.arange(nsamp)
+  y = y.ravel(order='F')
+
+  for k in xrange(nrecs):
+    ys = y[ind]
+    ys = (ys.reshape(1,-1) - np.mean(ys)) * wind
+
+    Yf = np.fft.fft(ys, nfft)/nsamp
+    CYf = np.conjugate(Yf)
+    Pyy = Pyy + flat_eq(Pyy, (Yf*CYf))
+
+    Yf12 = flat_eq(Yf12, CYf.ravel(order='F')[mask])
+
+    bic = bic + ((Yf * np.transpose(Yf)) * Yf12)
+    ind = ind + int(nadvance)
+
+
+  bic = bic / nrecs
+  Pyy = Pyy / nrecs
+  mask = flat_eq(mask, Pyy.ravel(order='F')[mask])
+  bic = abs(bic)**2 / ((Pyy * np.transpose(Pyy)) *  mask)
+  bic = np.fft.fftshift(bic)
+
+  if nfft%2 == 0:
+    waxis = np.transpose(np.arange(-1*nfft/2, nfft/2)) / nfft
+  else:
+    waxis = np.transpose(np.arange(-1*(nfft-1)/2, (nfft-1)/2+1)) / nfft
+
+  cont = plt.contourf(waxis,waxis,bic,100, cmap=plt.cm.Spectral_r)
+  plt.colorbar(cont)
+  plt.title('Bicoherence estimated via the direct (FFT) method')
+  plt.xlabel('f1')
+  plt.ylabel('f2')
+
+  colmax, row = bic.max(0), bic.argmax(0)
+  maxval, col = colmax.max(0), colmax.argmax(0)
+  print 'Max: bic('+str(waxis[col])+','+str(waxis[col])+') = '+str(maxval)
+  plt.show()
+
+  return (bic, waxis)
+
+
+def test():
+  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
+  dbic = bicoherence(qpc['zmat'])
+
+
+if __name__ == '__main__':
+  test()

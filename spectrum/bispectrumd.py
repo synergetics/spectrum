@@ -1,147 +1,173 @@
+#!/usr/bin/env python
+
+from __future__ import division
 import numpy as np
 from scipy.linalg import hankel
 from scipy.signal import convolve2d
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
+from ..tools import *
 
-def bispectrumd(y, nfft=None, window=None, nsamp=None, overlap=None):
-    """
-    Estimate bispectrum using the direct (FFT) method.
 
-    Parameters:
-    -----------
-    y : array_like
-        Input data vector or time-series.
-    nfft : int, optional
-        FFT length. If None, uses the next power of two > nsamp.
-    window : array_like or int, optional
-        If array: 2D window for frequency-domain smoothing.
-        If int: length of the side of the square for the Rao-Gabr optimal window.
-        If None, no frequency-domain smoothing is applied.
-    nsamp : int, optional
-        Samples per segment. If None, uses 8 segments.
-    overlap : int, optional
-        Percentage overlap of segments (0-99). If None, uses 50%.
+def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
+  """
+  Parameters:
+    y    - data vector or time-series
+    nfft - fft length [default = power of two > segsamp]
+    wind - window specification for frequency-domain smoothing
+           if 'wind' is a scalar, it specifies the length of the side
+              of the square for the Rao-Gabr optimal window  [default=5]
+           if 'wind' is a vector, a 2D window will be calculated via
+              w2(i,j) = wind(i) * wind(j) * wind(i+j)
+           if 'wind' is a matrix, it specifies the 2-D filter directly
+    segsamp - samples per segment [default: such that we have 8 segments]
+            - if y is a matrix, segsamp is set to the number of rows
+    overlap - percentage overlap [default = 50]
+            - if y is a matrix, overlap is set to 0.
 
-    Returns:
-    --------
-    Bspec : ndarray
-        Estimated bispectrum: an nfft x nfft array, with origin
-        at the center, and axes pointing down and to the right.
-    waxis : ndarray
-        Vector of frequencies associated with the rows and columns of Bspec.
-    """
-    # Ensure input is a numpy array
-    y = np.asarray(y)
-    if y.ndim == 1:
-        y = y.reshape(1, -1)
-    ly, nrecs = y.shape
+  Output:
+    Bspec   - estimated bispectrum: an nfft x nfft array, with origin
+              at the center, and axes pointing down and to the right.
+    waxis   - vector of frequencies associated with the rows and columns
+              of Bspec;  sampling frequency is assumed to be 1.
+  """
 
-    # Set default parameters
-    if nfft is None:
-        nfft = 128
-    if overlap is None:
-        overlap = 50 if nrecs == 1 else 0
-    if nsamp is None:
-        nsamp = ly if nrecs > 1 else 0
+  (ly, nrecs) = y.shape
+  if ly == 1:
+    y = y.shape(1,-1)
+    ly = nrecs
+    nrecs = 1
 
-    # Adjust parameters
-    if nrecs == 1 and nsamp <= 0:
-        nsamp = int(ly / (8 - 7 * overlap / 100))
-    if nfft < nsamp:
-        nfft = 2 ** int(np.ceil(np.log2(nsamp)))
+  if not nfft: nfft = 128
+  if not overlap: overlap = 50
+  overlap = min(99, max(overlap, 0))
+  if nrecs > 1: overlap = 0
+  if not nsamp: nsamp = 0
+  if nrecs > 1: nsamp = ly
+  if nrecs == 1 and nsamp <= 0:
+    nsamp = np.fix(ly/ (8 - 7 * overlap/100))
+  if nfft < nsamp:
+    nfft = 2**nextpow2(nsamp)
+  overlap = np.fix(nsamp*overlap / 100)
+  nadvance = nsamp - overlap
+  nrecs = np.fix((ly*nrecs - overlap) / nadvance)
 
-    overlap = int(nsamp * overlap / 100)
-    nadvance = nsamp - overlap
-    nrecs = int((ly * nrecs - overlap) / nadvance)
+  if not wind: wind = 5
 
-    # Create the 2-D window for frequency-domain smoothing
-    if window is None:
-        window = np.ones((1, 1))
-    elif np.isscalar(window):
-        winsize = int(window)
-        if winsize < 0:
-            winsize = 5
-        winsize = winsize - (winsize % 2) + 1  # make it odd
-        if winsize > 1:
-            mwind = int(nfft / winsize)
-            lby2 = (winsize - 1) // 2
-            theta = np.arange(-lby2, lby2 + 1)
-            opwind = (
-                np.outer(theta**2, np.ones(winsize)) + np.outer(np.ones(winsize), theta**2) + np.outer(theta, theta)
-            )
-            opwind = 1 - ((2 * mwind / nfft) ** 2) * opwind
-            Hex = (
-                np.abs(np.outer(theta, np.ones(winsize)))
-                + np.abs(np.outer(np.ones(winsize), theta))
-                + np.abs(np.outer(theta, theta))
-            )
-            opwind = opwind * (Hex < winsize)
-            opwind = opwind * (4 * mwind**2) / (7 * np.pi**2)
-        else:
-            opwind = np.ones((1, 1))
+  m = n = 0
+  try:
+    (m, n) = wind.shape
+  except ValueError:
+    (m,) = wind.shape
+    n = 1
+  except AttributeError:
+    m = n = 1
+
+  window = wind
+  # scalar: wind is size of Rao-Gabr window
+  if max(m, n) == 1:
+    winsize = wind
+    if winsize < 0: winsize = 5 # the window size L
+    winsize = winsize - (winsize%2) + 1 # make it odd
+    if winsize > 1:
+      mwind = np.fix(nfft/winsize) # the scale parameter M
+      lby2 = (winsize - 1)/2
+
+      theta = np.array([np.arange(-1*lby2, lby2+1)]) # force a 2D array
+      opwind = np.ones([winsize, 1]) * (theta**2) # w(m,n) = m**2
+      opwind = opwind + opwind.transpose() + (np.transpose(theta) * theta) # m**2 + n**2 + mn
+      opwind = 1 - ((2*mwind/nfft)**2) * opwind
+      Hex = np.ones([winsize,1]) * theta
+      Hex = abs(Hex) + abs(np.transpose(Hex)) + abs(Hex + np.transpose(Hex))
+      Hex = (Hex < winsize)
+      opwind = opwind * Hex
+      opwind = opwind * (4 * mwind**2) / (7 * np.pi**2)
     else:
-        opwind = np.asarray(window)
-        if opwind.ndim != 2 or opwind.shape[0] != opwind.shape[1]:
-            raise ValueError("2-D window must be square")
+      opwind = 1
 
-    # Initialize arrays
-    Bspec = np.zeros((nfft, nfft), dtype=complex)
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
+  # 1-D window passed: convert to 2-D
+  elif min(m, n) == 1:
+    window = window.reshape(1,-1)
 
-    # Main loop for bispectrum estimation
-    for krec in range(nrecs):
-        ind = slice(krec * nadvance, krec * nadvance + nsamp)
-        xseg = y.flat[ind]
-        xseg = xseg - np.mean(xseg)
+    if np.any(np.imag(window)) != 0:
+      print "1-D window has imaginary components: window ignored"
+      window = 1
 
-        Xf = np.fft.fft(xseg, nfft) / nsamp
-        CXf = np.conj(Xf)
+    if np.any(window) < 0:
+      print "1-D window has negative components: window ignored"
+      window = 1
 
-        Bspec += np.outer(Xf, Xf) * CXf[mask].reshape(nfft, nfft)
+    lwind = np.size(window)
+    w = window.ravel(order='F')
+    # the full symmetric 1-D
+    windf = np.array(w[range(lwind-1, 0, -1) + [window]])
+    window = np.array([window], np.zeros([lwind-1,1]))
+    # w(m)w(n)w(m+n)
+    opwind = (windf * np.transpose(windf)) * hankel(np.flipud(window), window)
+    winsize = np.size(window)
 
-    Bspec = np.fft.fftshift(Bspec) / nrecs
+  # 2-D window passed: use directly
+  else:
+    winsize = m
 
-    # Frequency-domain smoothing
-    if opwind.size > 1:
-        Bspec = convolve2d(Bspec, opwind, mode="same")
+    if m != n:
+      print "2-D window is not square: window ignored"
+      window = 1
+      winsize = m
 
-    # Compute frequency axis
-    waxis = np.fft.fftshift(np.fft.fftfreq(nfft))
+    if m%2 == 0:
+      print "2-D window does not have odd length: window ignored"
+      window = 1
+      winsize = m
 
-    return Bspec, waxis
+    opwind = window
 
 
-def plot_bispectrum(Bspec, waxis, title="Bispectrum"):
-    """
-    Plot the bispectrum estimate.
+  # accumulate triple products
+  Bspec = np.zeros([nfft, nfft]) # the hankel mask (faster)
+  mask = hankel(np.arange(nfft),np.array([nfft-1]+range(nfft-1)))
+  locseg = np.arange(nsamp).transpose()
+  y = y.ravel(order='F')
 
-    Parameters:
-    -----------
-    Bspec : ndarray
-        Bispectrum estimate from the bispectrumd function.
-    waxis : ndarray
-        Frequency axis from the bispectrumd function.
-    title : str, optional
-        Title for the plot.
-    """
-    plt.figure(figsize=(10, 8))
-    cont = plt.contourf(waxis, waxis, np.abs(Bspec), 100, cmap=plt.cm.Spectral_r)
-    plt.colorbar(cont)
-    plt.title(title)
-    plt.xlabel("f1")
-    plt.ylabel("f2")
+  for krec in xrange(nrecs):
+    xseg = y[locseg].reshape(1,-1)
+    Xf = np.fft.fft(xseg - np.mean(xseg), nfft) / nsamp
+    CXf = np.conjugate(Xf).ravel(order='F')
+    Bspec = Bspec + \
+      flat_eq(Bspec, (Xf * np.transpose(Xf)) * CXf[mask].reshape(nfft, nfft))
+    locseg = locseg + int(nadvance)
 
-    # Find and annotate maximum
-    max_val = np.max(np.abs(Bspec))
-    max_idx = np.unravel_index(np.argmax(np.abs(Bspec)), Bspec.shape)
-    plt.plot(waxis[max_idx[1]], waxis[max_idx[0]], "r*", markersize=15)
-    plt.annotate(
-        f"Max: {max_val:.3f}",
-        xy=(waxis[max_idx[1]], waxis[max_idx[0]]),
-        xytext=(10, 10),
-        textcoords="offset points",
-        color="red",
-    )
+  Bspec = np.fft.fftshift(Bspec) / nrecs
 
-    plt.show()
+
+  # frequency-domain smoothing
+  if winsize > 1:
+    lby2 = int((winsize-1)/2)
+    Bspec = convolve2d(Bspec,opwind)
+    Bspec = Bspec[range(lby2+1,lby2+nfft+1), :][:, np.arange(lby2+1,lby2+nfft+1)]
+
+
+  if nfft%2 == 0:
+    waxis = np.transpose(np.arange(-1*nfft/2, nfft/2)) / nfft
+  else:
+    waxis = np.transpose(np.arange(-1*(nfft-1)/2, (nfft-1)/2+1)) / nfft
+
+  # cont1 = plt.contour(abs(Bspec), 4, waxis, waxis)
+  cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap=plt.cm.Spectral_r)
+  plt.colorbar(cont)
+  plt.title('Bispectrum estimated via the direct (FFT) method')
+  plt.xlabel('f1')
+  plt.ylabel('f2')
+  plt.show()
+
+  return (Bspec, waxis)
+
+
+def test():
+  qpc = sio.loadmat(here(__file__) + '/demo/qpc.mat')
+  dbic = bispectrumd(qpc['zmat'], 128,3,64,0)
+
+
+if __name__ == '__main__':
+  test()

@@ -1,91 +1,57 @@
+#!/usr/bin/env python
+
+from __future__ import division
 import numpy as np
+from scipy.linalg import hankel
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
+from ..tools import *
 
-def cum2est(y, maxlag=0, nsamp=None, overlap=0, flag="biased"):
+
+def cum2est(y, maxlag, nsamp, overlap, flag):
     """
-    Estimate the second-order cumulants (autocovariance) of a time series.
-
+    CUM2EST Covariance function.
+    Should be involed via "CUMEST" for proper parameter checks.
     Parameters:
-    -----------
-    y : array_like
-        Input data vector or time-series.
-    maxlag : int, optional
-        Maximum lag to be computed. Default is 0.
-    nsamp : int, optional
-        Samples per segment. If None, nsamp is set to len(y).
-    overlap : int, optional
-        Percentage overlap of segments (0-99). Default is 0.
-    flag : str, optional
-        'biased' or 'unbiased'. Default is 'biased'.
+             y: input data vector (column)
+        maxlag: maximum lag to be computed
+      samp_seg: samples per segment (<=0 means no segmentation)
+       overlap: percentage overlap of segments
+          flag: 'biased', biased estimates are computed
+                'unbiased', unbiased estimates are computed.
 
-    Returns:
-    --------
-    y_cum : ndarray
-        Estimated second-order cumulant (autocovariance),
-        C2(m) for -maxlag <= m <= maxlag
+    Output:
+         y_cum: estimated covariance,
+                C2(m)  -maxlag <= m <= maxlag
     """
-    y = np.asarray(y)
-    y = y.squeeze()
 
-    # Check input dimensions
-    if y.ndim != 1:
-        raise ValueError("Input time series must be a 1-D array.")
+    (n1, n2) = shape(y, 2)
+    N = n1 * n2
+    overlap = np.fix(overlap / 100 * nsamp)
+    nrecord = np.fix((N - overlap) / (nsamp - overlap))
+    nadvance = nsamp - overlap
 
-    N = len(y)
-
-    if nsamp is None or nsamp > N:
-        nsamp = N
-
-    overlap = np.clip(overlap, 0, 99)
-    nadvance = nsamp - int(overlap / 100 * nsamp)
-
-    nrecs = int((N - overlap) / nadvance)
-
-    y_cum = np.zeros(2 * maxlag + 1)
-
+    y_cum = np.zeros([maxlag + 1, 1])
     ind = np.arange(nsamp)
+    y = y.ravel(order="F")
 
-    # Compute second-order cumulants
-    for _ in range(nrecs):
+    for i in xrange(nrecord):
         x = y[ind]
         x = x - np.mean(x)
 
-        for k in range(maxlag + 1):
-            y_cum[maxlag + k] += np.dot(x[0 : nsamp - k], x[k:nsamp])
+        for k in xrange(maxlag + 1):
+            y_cum[k] = y_cum[k] + np.dot(x[0 : nsamp - k].T, x[k:nsamp])
 
-        ind += nadvance
+        ind = ind + int(nadvance)
 
-    # Normalize
     if flag == "biased":
-        y_cum = y_cum / (nsamp * nrecs)
-    else:  # 'unbiased'
-        y_cum = y_cum / (nrecs * (nsamp - np.abs(np.arange(-maxlag, maxlag + 1))))
+        y_cum = y_cum / (nsamp * nrecord)
+    else:
+        y_cum = y_cum / (nrecord * (nsamp - np.matrix(range(maxlag + 1)).T))
+        y_cum = np.asarray(y_cum)
 
-    # Fill in the negative lags
-    y_cum[0:maxlag] = y_cum[-1:maxlag:-1].conj()
+    if maxlag > 0:
+        y_cum = make_arr([np.conj(y_cum[maxlag:0:-1]), y_cum], axis=0)
 
     return y_cum
-
-
-def plot_autocovariance(lags, acov, title="Autocovariance"):
-    """
-    Plot the autocovariance function.
-
-    Parameters:
-    -----------
-    lags : array_like
-        Lag values.
-    acov : array_like
-        Autocovariance values.
-    title : str, optional
-        Title for the plot.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(lags, acov, "b-")
-    plt.title(title)
-    plt.xlabel("Lag")
-    plt.ylabel("Autocovariance")
-    plt.grid(True)
-    plt.axhline(y=0, color="r", linestyle="--")
-    plt.show()

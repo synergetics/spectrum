@@ -1,101 +1,74 @@
+#!/usr/bin/env python
+
+from __future__ import division
 import numpy as np
+from scipy.linalg import hankel
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
+from ..tools import *
 
-def cum3est(y, maxlag=0, nsamp=None, overlap=0, flag="biased", k1=0):
+
+def cum3est(y, maxlag, nsamp, overlap, flag, k1):
     """
-    Estimate the third-order cumulants of a time series.
-
+    UM3EST Third-order cumulants.
+    Should be invoked via "CUMEST" for proper parameter checks
     Parameters:
-    -----------
-    y : array_like
-        Input data vector or time-series.
-    maxlag : int, optional
-        Maximum lag to be computed. Default is 0.
-    nsamp : int, optional
-        Samples per segment. If None, nsamp is set to len(y).
-    overlap : int, optional
-        Percentage overlap of segments (0-99). Default is 0.
-    flag : str, optional
-        'biased' or 'unbiased'. Default is 'biased'.
-    k1 : int, optional
-        The fixed lag in C3(m,k1). Default is 0.
+             y: input data vector (column)
+        maxlag: maximum lag to be computed
+      samp_seg: samples per segment
+       overlap: percentage overlap of segments
+         flag : 'biased', biased estimates are computed  [default]
+                'unbiased', unbiased estimates are computed.
+            k1: the fixed lag in c3(m,k1): see below
 
-    Returns:
-    --------
-    y_cum : ndarray
-        Estimated third-order cumulant,
-        C3(m,k1) for -maxlag <= m <= maxlag
+    Output:
+         y_cum:  estimated third-order cumulant,
+                 C3(m,k1)  -maxlag <= m <= maxlag
     """
-    y = np.asarray(y).squeeze()
 
-    # Check input dimensions
-    if y.ndim != 1:
-        raise ValueError("Input time series must be a 1-D array.")
+    (n1, n2) = np.shape(y)
+    N = n1 * n2
+    minlag = -maxlag
+    overlap = np.fix(overlap / 100 * nsamp)
+    nrecord = np.fix((N - overlap) / (nsamp - overlap))
+    nadvance = nsamp - overlap
 
-    N = len(y)
+    y_cum = np.zeros([maxlag - minlag + 1, 1])
 
-    if nsamp is None or nsamp > N:
-        nsamp = N
+    ind = np.arange(nsamp).T
+    nlags = 2 * maxlag + 1
+    zlag = maxlag
+    if flag == "biased":
+        scale = np.ones([nlags, 1]) / nsamp
+    else:
+        lsamp = nsamp - abs(k1)
+        scale = make_arr((range(lsamp - maxlag, lsamp + 1), range(lsamp - 1, lsamp - maxlag - 1, -1)), axis=1).T
+        (m2, n2) = scale.shape
+        scale = np.ones([m2, n2]) / scale
 
-    overlap = np.clip(overlap, 0, 99)
-    nadvance = nsamp - int(overlap / 100 * nsamp)
-
-    nrecs = int((N - nsamp) / nadvance) + 1
-
-    y_cum = np.zeros(2 * maxlag + 1)
-
-    # Compute third-order cumulants
-    for i in range(nrecs):
-        ind = slice(i * nadvance, i * nadvance + nsamp)
+    y = y.ravel(order="F")
+    for i in xrange(nrecord):
         x = y[ind]
         x = x - np.mean(x)
         cx = np.conj(x)
+        z = x * 0
 
-        # Create the "IV" vector
-        if k1 >= 0:
-            iv = x[:-k1] * cx[k1:]
-            ind1 = np.arange(nsamp - k1)
+        # create the "IV" matrix: offset for second lag
+        if k1 > 0:
+            z[0 : nsamp - k1] = x[0 : nsamp - k1] * cx[k1:nsamp]
         else:
-            iv = x[-k1:] * cx[:k1]
-            ind1 = np.arange(-k1, nsamp)
+            z[-k1:nsamp] = x[-k1:nsamp] * cx[0 : nsamp + k1]
 
-        y_cum[maxlag] += np.dot(iv, x[ind1])
+        # compute third-order cumulants
+        y_cum[zlag] = y_cum[zlag] + np.dot(z.T, x)
 
-        for k in range(1, maxlag + 1):
-            y_cum[maxlag + k] += np.dot(iv[k:], x[ind1[:-k]])
-            y_cum[maxlag - k] += np.dot(iv[:-k], x[ind1[k:]])
+        for k in xrange(1, maxlag + 1):
+            y_cum[zlag - k] = y_cum[zlag - k] + np.dot(z[k:nsamp].T, x[0 : nsamp - k])
+            y_cum[zlag + k] = y_cum[zlag + k] + np.dot(z[0 : nsamp - k].T, x[k:nsamp])
 
-    # Normalize
-    if flag == "biased":
-        y_cum = y_cum / (nsamp * nrecs)
-    else:  # 'unbiased'
-        lsamp = nsamp - abs(k1)
-        y_cum = y_cum / (nrecs * (lsamp - np.abs(np.arange(-maxlag, maxlag + 1))))
+        ind = ind + int(nadvance)
+
+    y_cum = y_cum * scale / nrecord
 
     return y_cum
-
-
-def plot_third_order_cumulant(lags, cumulant, k1, title="Third-Order Cumulant"):
-    """
-    Plot the third-order cumulant function.
-
-    Parameters:
-    -----------
-    lags : array_like
-        Lag values.
-    cumulant : array_like
-        Third-order cumulant values.
-    k1 : int
-        The fixed lag value.
-    title : str, optional
-        Title for the plot.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(lags, cumulant, "b-")
-    plt.title(f"{title} (k1 = {k1})")
-    plt.xlabel("Lag m")
-    plt.ylabel("C3(m,k1)")
-    plt.grid(True)
-    plt.axhline(y=0, color="r", linestyle="--")
-    plt.show()
