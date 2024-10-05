@@ -1,9 +1,18 @@
 import numpy as np
-from scipy.linalg import hankel
+import torch
 import matplotlib.pyplot as plt
+from typing import Tuple, Union, Optional
 
 
-def bicoherencex(w, x, y, nfft=None, window=None, nsamp=None, overlap=None):
+def bicoherencex(
+    w: Union[np.ndarray, torch.Tensor],
+    x: Union[np.ndarray, torch.Tensor],
+    y: Union[np.ndarray, torch.Tensor],
+    nfft: Optional[int] = None,
+    window: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    nsamp: Optional[int] = None,
+    overlap: Optional[int] = None,
+) -> Tuple[Union[np.ndarray, torch.Tensor], Union[np.ndarray, torch.Tensor]]:
     """
     Direct (FD) method for estimating cross-bicoherence.
 
@@ -29,8 +38,14 @@ def bicoherencex(w, x, y, nfft=None, window=None, nsamp=None, overlap=None):
     waxis : ndarray
         Vector of frequencies associated with the rows and columns of bic.
     """
-    # Ensure inputs are numpy arrays and have the same shape
-    w, x, y = map(np.asarray, (w, x, y))
+    # Determine if we're using PyTorch
+    use_torch = isinstance(w, torch.Tensor) or isinstance(x, torch.Tensor) or isinstance(y, torch.Tensor)
+
+    # Use the appropriate library
+    lib = torch if use_torch else np
+
+    # Ensure inputs are numpy arrays or PyTorch tensors and have the same shape
+    w, x, y = map(lib.asarray, (w, x, y))
     if not (w.shape == x.shape == y.shape):
         raise ValueError("w, x, and y must have identical dimensions")
 
@@ -50,55 +65,58 @@ def bicoherencex(w, x, y, nfft=None, window=None, nsamp=None, overlap=None):
         nsamp = ly
 
     # Adjust parameters
-    overlap = np.clip(overlap, 0, 99)
+    overlap = lib.clip(overlap, 0, 99)
     overlap = int(nsamp * overlap / 100)
     nadvance = nsamp - overlap
     nrecs = int((ly - overlap) / nadvance)
 
     if nfft < nsamp:
-        nfft = 2 ** int(np.ceil(np.log2(nsamp)))
+        nfft = 2 ** int(lib.ceil(lib.log2(lib.tensor(nsamp) if use_torch else nsamp)))
 
     # Create window
     if window is None:
-        window = np.hanning(nsamp)
-    window = np.asarray(window).ravel()
+        window = lib.hann(nsamp) if use_torch else np.hanning(nsamp)
+    window = lib.asarray(window).ravel()
 
     if len(window) != nsamp:
         raise ValueError(f"Window length ({len(window)}) must match nsamp ({nsamp})")
 
     # Initialize arrays
-    bic = np.zeros((nfft, nfft), dtype=complex)
-    Pww = np.zeros(nfft)
-    Pxx = np.zeros(nfft)
-    Pyy = np.zeros(nfft)
+    bic = lib.zeros((nfft, nfft), dtype=complex)
+    Pww = lib.zeros(nfft)
+    Pxx = lib.zeros(nfft)
+    Pyy = lib.zeros(nfft)
 
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
-    Yf12 = np.zeros((nfft, nfft), dtype=complex)
+    mask = (
+        lib.tensor(np.array([nfft - 1] + list(range(nfft - 1))))
+        if use_torch
+        else np.array([nfft - 1] + list(range(nfft - 1)))
+    )
+    Yf12 = lib.zeros((nfft, nfft), dtype=complex)
 
     # Main loop for cross-bispectrum estimation
     for k in range(nrecs):
         ind = slice(k * nadvance, k * nadvance + nsamp)
-        ws = w.flat[ind] - np.mean(w.flat[ind])
-        xs = x.flat[ind] - np.mean(x.flat[ind])
-        ys = y.flat[ind] - np.mean(y.flat[ind])
+        ws = w.flatten()[ind]
+        xs = x.flatten()[ind]
+        ys = y.flatten()[ind]
 
-        ws *= window
-        xs *= window
-        ys *= window
+        ws = (ws - lib.mean(ws)) * window
+        xs = (xs - lib.mean(xs)) * window
+        ys = (ys - lib.mean(ys)) * window
 
-        Wf = np.fft.fft(ws, nfft) / nsamp
-        Xf = np.fft.fft(xs, nfft) / nsamp
-        Yf = np.fft.fft(ys, nfft) / nsamp
+        Wf = lib.fft.fft(ws, nfft) / nsamp
+        Xf = lib.fft.fft(xs, nfft) / nsamp
+        Yf = lib.fft.fft(ys, nfft) / nsamp
 
-        CWf = np.conj(Wf)
-        CYf = np.conj(Yf)
+        CYf = lib.conj(Yf)
 
-        Pww += np.abs(Wf) ** 2
-        Pxx += np.abs(Xf) ** 2
-        Pyy += np.abs(Yf) ** 2
+        Pww += lib.abs(Wf) ** 2
+        Pxx += lib.abs(Xf) ** 2
+        Pyy += lib.abs(Yf) ** 2
 
         Yf12 = CYf[mask].reshape(nfft, nfft)
-        bic += np.outer(Wf, Xf) * Yf12
+        bic += lib.outer(Wf, Xf) * Yf12
 
     # Normalize and compute cross-bicoherence
     bic /= nrecs
@@ -106,16 +124,18 @@ def bicoherencex(w, x, y, nfft=None, window=None, nsamp=None, overlap=None):
     Pxx /= nrecs
     Pyy /= nrecs
 
-    bic = np.abs(bic) ** 2 / (np.outer(Pww, Pxx) * Pyy[mask].reshape(nfft, nfft))
-    bic = np.fft.fftshift(bic)
+    bic = lib.abs(bic) ** 2 / (lib.outer(Pww, Pxx) * Pyy[mask].reshape(nfft, nfft))
+    bic = lib.fft.fftshift(bic)
 
     # Compute frequency axis
-    waxis = np.fft.fftshift(np.fft.fftfreq(nfft))
+    waxis = lib.fft.fftshift(lib.fft.fftfreq(nfft))
 
     return bic, waxis
 
 
-def plot_cross_bicoherence(bic, waxis, title="Cross-Bicoherence"):
+def plot_cross_bicoherence(
+    bic: Union[np.ndarray, torch.Tensor], waxis: Union[np.ndarray, torch.Tensor], title: str = "Cross-Bicoherence"
+) -> None:
     """
     Plot the cross-bicoherence estimate.
 
@@ -128,6 +148,12 @@ def plot_cross_bicoherence(bic, waxis, title="Cross-Bicoherence"):
     title : str, optional
         Title for the plot.
     """
+    # Convert to numpy if tensors
+    if isinstance(bic, torch.Tensor):
+        bic = bic.cpu().numpy()
+    if isinstance(waxis, torch.Tensor):
+        waxis = waxis.cpu().numpy()
+
     plt.figure(figsize=(10, 8))
     cont = plt.contourf(waxis, waxis, bic, 100, cmap=plt.cm.Spectral_r)
     plt.colorbar(cont)

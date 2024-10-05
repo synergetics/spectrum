@@ -1,9 +1,16 @@
 import numpy as np
-from scipy.linalg import hankel
 import matplotlib.pyplot as plt
+from typing import Tuple, Union, Optional
+import torch
 
 
-def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
+def bicoherence(
+    y: Union[np.ndarray, torch.Tensor],
+    nfft: Optional[int] = None,
+    window: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    nsamp: Optional[int] = None,
+    overlap: Optional[int] = None,
+) -> Tuple[Union[np.ndarray, torch.Tensor], Union[np.ndarray, torch.Tensor]]:
     """
     Direct (FD) method for estimating bicoherence.
 
@@ -29,8 +36,14 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
     waxis : ndarray
         Vector of frequencies associated with the rows and columns of bic.
     """
+    # Determine if we're using PyTorch
+    use_torch = isinstance(y, torch.Tensor)
+
+    # Use the appropriate library
+    lib = torch if use_torch else np
+
     # Reshape input if necessary
-    y = np.asarray(y)
+    y = lib.asarray(y)
     if y.ndim == 1:
         y = y.reshape(1, -1)
     ly, nrecs = y.shape
@@ -47,7 +60,7 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
     if nrecs == 1 and nsamp <= 0:
         nsamp = int(ly / (8 - 7 * overlap / 100))
     if nfft < nsamp:
-        nfft = 2 ** int(np.ceil(np.log2(nsamp)))
+        nfft = 2 ** int(lib.ceil(lib.log2(lib.tensor(nsamp) if use_torch else nsamp)))
 
     overlap = int(nsamp * overlap / 100)
     nadvance = nsamp - overlap
@@ -55,44 +68,48 @@ def bicoherence(y, nfft=None, window=None, nsamp=None, overlap=None):
 
     # Create window
     if window is None:
-        window = np.hanning(nsamp)
-    window = np.asarray(window).ravel()
+        window = lib.hann(nsamp) if use_torch else np.hanning(nsamp)
+    window = lib.asarray(window).ravel()
 
     if len(window) != nsamp:
         raise ValueError(f"Window length ({len(window)}) must match nsamp ({nsamp})")
 
     # Initialize arrays
-    bic = np.zeros((nfft, nfft), dtype=complex)
-    Pyy = np.zeros(nfft)
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
-    Yf12 = np.zeros((nfft, nfft), dtype=complex)
+    bic = lib.zeros((nfft, nfft), dtype=complex)
+    Pyy = lib.zeros(nfft)
+    mask = (
+        lib.tensor(hankel(lib.arange(nfft), lib.array([nfft - 1] + list(range(nfft - 1)))))
+        if use_torch
+        else hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
+    )
+    Yf12 = lib.zeros((nfft, nfft), dtype=complex)
 
     # Main loop for bispectrum estimation
     for k in range(nrecs):
         ind = slice(k * nadvance, k * nadvance + nsamp)
-        ys = y.flat[ind]
-        ys = (ys - np.mean(ys)) * window
+        ys = y.flatten()[ind]
+        ys = (ys - lib.mean(ys)) * window
 
-        Yf = np.fft.fft(ys, nfft) / nsamp
-        CYf = np.conj(Yf)
-        Pyy += np.abs(Yf) ** 2
+        Yf = lib.fft.fft(ys, nfft) / nsamp
+        CYf = lib.conj(Yf)
+        Pyy += lib.abs(Yf) ** 2
 
         Yf12 = CYf[mask].reshape(nfft, nfft)
-        bic += np.outer(Yf, Yf) * Yf12
+        bic += lib.outer(Yf, Yf) * Yf12
 
     # Normalize and compute bicoherence
     bic /= nrecs
     Pyy /= nrecs
-    bic = np.abs(bic) ** 2 / (np.outer(Pyy, Pyy) * Pyy[mask].reshape(nfft, nfft))
-    bic = np.fft.fftshift(bic)
+    bic = lib.abs(bic) ** 2 / (lib.outer(Pyy, Pyy) * Pyy[mask].reshape(nfft, nfft))
+    bic = lib.fft.fftshift(bic)
 
     # Compute frequency axis
-    waxis = np.fft.fftshift(np.fft.fftfreq(nfft))
+    waxis = lib.fft.fftshift(lib.fft.fftfreq(nfft))
 
     return bic, waxis
 
 
-def plot_bicoherence(bic, waxis):
+def plot_bicoherence(bic: Union[np.ndarray, torch.Tensor], waxis: Union[np.ndarray, torch.Tensor]) -> None:
     """
     Plot the bicoherence estimate.
 
@@ -103,6 +120,12 @@ def plot_bicoherence(bic, waxis):
     waxis : ndarray
         Frequency axis from the bicoherence function.
     """
+    # Convert to numpy if tensors
+    if isinstance(bic, torch.Tensor):
+        bic = bic.cpu().numpy()
+    if isinstance(waxis, torch.Tensor):
+        waxis = waxis.cpu().numpy()
+
     plt.figure(figsize=(10, 8))
     cont = plt.contourf(waxis, waxis, bic, 100, cmap=plt.cm.Spectral_r)
     plt.colorbar(cont)
