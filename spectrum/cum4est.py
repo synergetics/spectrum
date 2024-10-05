@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-from __future__ import division
+
 import numpy as np
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
 
-from ..tools import *
+from tools import nextpow2, flat_eq, make_arr, shape
 from cum2est import *
 from cum2x import *
 
@@ -70,7 +70,7 @@ def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
     R_yy = np.zeros([2 * mlag + 1, 1])
 
     ind = np.arange(nsamp)
-    for i in xrange(nrecord):
+    for i in range(nrecord):
         tmp = np.zeros([2 * maxlag + 1, 1])
         x = y[ind]
         x = x.ravel(order="F") - np.mean(x)
@@ -93,7 +93,7 @@ def cum4est(y, maxlag=0, nsamp=0, overlap=0, flag="biased", k1=0, k2=0):
 
         tmp[zlag] = tmp[zlag] + np.dot(z.T, x)
 
-        for k in xrange(1, maxlag + 1):
+        for k in range(1, maxlag + 1):
             tmp[zlag - k] = tmp[zlag - k] + np.dot(z[k:nsamp].T, x[0 : nsamp - k])
             tmp[zlag + k] = tmp[zlag + k] + np.dot(z[0 : nsamp - k].T, x[k:nsamp])
 
