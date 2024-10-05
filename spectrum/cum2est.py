@@ -6,6 +6,7 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
@@ -13,7 +14,13 @@ from tools import nextpow2, flat_eq, make_arr, shape
 log = logging.getLogger(__file__)
 
 
-def cum2est(y, maxlag, nsamp, overlap, flag):
+def cum2est(
+    y: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int,
+    nsamp: int,
+    overlap: int,
+    flag: str,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     CUM2EST Covariance function.
     Should be involed via "CUMEST" for proper parameter checks.
@@ -32,7 +39,7 @@ def cum2est(y, maxlag, nsamp, overlap, flag):
 
     (n1, n2) = shape(y, 2)
     N = n1 * n2
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = np.fix(overlap / 100 * nsamp)  # type: ignore
     nrecord = np.fix((N - overlap) / (nsamp - overlap))
     nadvance = nsamp - overlap
 

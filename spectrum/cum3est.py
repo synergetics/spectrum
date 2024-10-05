@@ -6,6 +6,7 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
@@ -13,7 +14,14 @@ from tools import nextpow2, flat_eq, make_arr, shape
 log = logging.getLogger(__file__)
 
 
-def cum3est(y, maxlag, nsamp, overlap, flag, k1):
+def cum3est(
+    y: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int,
+    nsamp: int,
+    overlap: int,
+    flag: str,
+    k1: int,
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     UM3EST Third-order cumulants.
     Should be invoked via "CUMEST" for proper parameter checks
@@ -34,8 +42,8 @@ def cum3est(y, maxlag, nsamp, overlap, flag, k1):
     (n1, n2) = np.shape(y)
     N = n1 * n2
     minlag = -maxlag
-    overlap = np.fix(overlap / 100 * nsamp)
-    nrecord = np.fix((N - overlap) / (nsamp - overlap))
+    overlap = int(np.fix(overlap / 100 * nsamp))
+    nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 
     y_cum = np.zeros([maxlag - minlag + 1, 1])

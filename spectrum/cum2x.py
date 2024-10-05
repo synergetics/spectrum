@@ -6,6 +6,7 @@ import logging
 from scipy.linalg import hankel
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
@@ -13,7 +14,14 @@ from tools import nextpow2, flat_eq, make_arr, shape
 log = logging.getLogger(__file__)
 
 
-def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag="biased"):
+def cum2x(
+    x: np.ndarray[Any, np.dtype[Any]],
+    y: np.ndarray[Any, np.dtype[Any]],
+    maxlag: int = 0,
+    nsamp: int = 0,
+    overlap: int = 0,
+    flag: str = "biased",
+) -> np.ndarray[Any, np.dtype[Any]]:
     """
     Cross-covariance
     Parameters:
@@ -51,10 +59,10 @@ def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag="biased"):
         overlap = 0
     overlap = max(0, min(overlap, 99))
 
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
     if nrecs == 1:
-        nrecs = np.fix((lx - overlap) / nadvance)
+        nrecs = int(np.fix((lx - overlap) / nadvance))
 
     nlags = 2 * maxlag + 1
     zlag = maxlag
@@ -84,17 +92,3 @@ def cum2x(x, y, maxlag=0, nsamp=0, overlap=0, flag="biased"):
     y_cum = y_cum * scale / nrecs
 
     return y_cum
-
-
-def test():
-    y = sio.loadmat(here(__file__) + "/demo/ma1.mat")["y"]
-
-    # The right results are:
-    #           "biased": [--0.25719  -0.12011   0.35908   1.01378   0.35908  -0.12011  -0.25719]
-    #           "unbiased": [-0.025190  -0.011753   0.035101   0.099002   0.035101  -0.011753  -0.025190]
-    log.info(cum2x(y, y, 3, 100, 0, "biased"))
-    log.info(cum2x(y, y, 3, 100, 0, "unbiased"))
-
-
-if __name__ == "__main__":
-    test()
