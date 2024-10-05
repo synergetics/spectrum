@@ -2,15 +2,25 @@
 
 
 import numpy as np
+import logging
 from scipy.linalg import hankel
 from scipy.signal import convolve2d
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from typing import Tuple, Optional, Any, Union
 
 from tools import nextpow2, flat_eq, make_arr, shape
 
+log = logging.getLogger(__file__)
 
-def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
+
+def bispectrumd(
+    y: np.ndarray[Any, np.dtype[Any]],
+    nfft: int = 128,
+    wind: Union[int, np.ndarray[Any, np.dtype[Any]]] = 5,
+    nsamp: int = 0,
+    overlap: int = 50,
+) -> Tuple[np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]]:
     """
     Parameters:
       y    - data vector or time-series
@@ -34,10 +44,12 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
     """
 
     (ly, nrecs) = y.shape
-    if ly == 1:
-        y = y.shape(1, -1)
-        ly = nrecs
-        nrecs = 1
+
+    # TODO: figure out if we need this anymore
+    # if ly == 1:
+    #     y = y.shape(1, -1)
+    #     ly = nrecs
+    #     nrecs = 1
 
     if not nfft:
         nfft = 128
@@ -51,26 +63,26 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
     if nrecs > 1:
         nsamp = ly
     if nrecs == 1 and nsamp <= 0:
-        nsamp = np.fix(ly / (8 - 7 * overlap / 100))
+        nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
     if nfft < nsamp:
         nfft = 2 ** nextpow2(nsamp)
-    overlap = np.fix(nsamp * overlap / 100)
+    overlap = int(np.fix(nsamp * overlap / 100))
     nadvance = nsamp - overlap
-    nrecs = np.fix((ly * nrecs - overlap) / nadvance)
-
-    if not wind:
-        wind = 5
+    nrecs = int(np.fix((ly * nrecs - overlap) / nadvance))
 
     m = n = 0
-    try:
-        (m, n) = wind.shape
-    except ValueError:
-        (m,) = wind.shape
-        n = 1
-    except AttributeError:
+    if type(wind) is int:
         m = n = 1
+    elif isinstance(wind, np.ndarray):
+        try:
+            (m, n) = wind.shape
+        except ValueError:
+            (m,) = wind.shape
+            n = 1
+        except AttributeError:
+            m = n = 1
 
-    window = wind
+    window = np.array([wind]) if type(wind) is int else wind
     # scalar: wind is size of Rao-Gabr window
     if max(m, n) == 1:
         winsize = wind
@@ -91,24 +103,24 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
             opwind = opwind * Hex
             opwind = opwind * (4 * mwind**2) / (7 * np.pi**2)
         else:
-            opwind = 1
+            opwind = 1  # type: ignore
 
     # 1-D window passed: convert to 2-D
     elif min(m, n) == 1:
-        window = window.reshape(1, -1)
+        window = window.reshape(1, -1)  # type: ignore
 
         if np.any(np.imag(window)) != 0:
             log.info("1-D window has imaginary components: window ignored")
-            window = 1
+            window = np.array([wind])
 
         if np.any(window) < 0:
             log.info("1-D window has negative components: window ignored")
-            window = 1
+            window = np.array([wind])
 
         lwind = np.size(window)
         w = window.ravel(order="F")
         # the full symmetric 1-D
-        windf = np.array(w[range(lwind - 1, 0, -1) + [window]])
+        windf = np.array(w[range(lwind - 1, 0, -1) + [window]])  # type: ignore
         window = np.array([window], np.zeros([lwind - 1, 1]))
         # w(m)w(n)w(m+n)
         opwind = (windf * np.transpose(windf)) * hankel(np.flipud(window), window)
@@ -128,11 +140,11 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
             window = 1
             winsize = m
 
-        opwind = window
+        opwind = window  # type: ignore
 
     # accumulate triple products
     Bspec = np.zeros([nfft, nfft])  # the hankel mask (faster)
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))
+    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))  # type: ignore
     locseg = np.arange(nsamp).transpose()
     y = y.ravel(order="F")
 
@@ -157,7 +169,7 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
         waxis = np.transpose(np.arange(-1 * (nfft - 1) / 2, (nfft - 1) / 2 + 1)) / nfft
 
     # cont1 = plt.contour(abs(Bspec), 4, waxis, waxis)
-    cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap=plt.cm.Spectral_r)
+    cont = plt.contourf(waxis, waxis, abs(Bspec), 100, cmap="viridis")
     plt.colorbar(cont)
     plt.title("Bispectrum estimated via the direct (FFT) method")
     plt.xlabel("f1")
@@ -165,12 +177,3 @@ def bispectrumd(y, nfft=None, wind=None, nsamp=None, overlap=None):
     plt.show()
 
     return (Bspec, waxis)
-
-
-def test():
-    qpc = sio.loadmat(here(__file__) + "/demo/qpc.mat")
-    dbic = bispectrumd(qpc["zmat"], 128, 3, 64, 0)
-
-
-if __name__ == "__main__":
-    test()
