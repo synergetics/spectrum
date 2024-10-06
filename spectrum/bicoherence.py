@@ -142,21 +142,3 @@ def plot_bicoherence(
     maxval, col = colmax.max(), colmax.argmax()
     log.info(f"Max: bic({waxis[col]:.6f}, {waxis[row[col]]:.6f}) = {maxval:.6f}")
     plt.show()
-
-
-if __name__ == "__main__":
-    # Example usage
-    # Generate some sample data
-    t = np.linspace(0, 10, 1000)
-    y = (
-        np.sin(2 * np.pi * 10 * t)
-        + 0.5 * np.sin(2 * np.pi * 20 * t)
-        + 0.3 * np.sin(2 * np.pi * 30 * t)
-        + np.random.normal(0, 0.1, t.shape)
-    )
-
-    # Estimate bicoherence
-    bic, waxis = bicoherence(y.reshape(-1, 1))
-
-    # Plot the results
-    plot_bicoherence(bic, waxis)

@@ -184,21 +184,3 @@ def plot_bispectrumi(Bspec: np.ndarray[Any, np.dtype[Any]], waxis: np.ndarray[An
     plt.xlabel("f1")
     plt.ylabel("f2")
     plt.show()
-
-
-if __name__ == "__main__":
-    # Example usage
-    # Generate some sample data
-    t = np.linspace(0, 10, 1000)
-    y = (
-        np.sin(2 * np.pi * 10 * t)
-        + 0.5 * np.sin(2 * np.pi * 20 * t)
-        + 0.3 * np.sin(2 * np.pi * 30 * t)
-        + np.random.normal(0, 0.1, t.shape)
-    )
-
-    # Estimate bispectrum
-    Bspec, waxis = bispectrumi(y.reshape(-1, 1), nlag=50)
-
-    # Plot the results
-    plot_bispectrumi(Bspec, waxis)

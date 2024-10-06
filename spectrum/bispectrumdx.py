@@ -180,18 +180,3 @@ def plot_bispectrumdx(Bspec: np.ndarray[Any, np.dtype[Any]], waxis: np.ndarray[A
     plt.xlabel("f1")
     plt.ylabel("f2")
     plt.show()
-
-
-if __name__ == "__main__":
-    # Example usage
-    # Generate some sample data
-    t = np.linspace(0, 10, 1000)
-    x = np.sin(2 * np.pi * 10 * t) + np.random.normal(0, 0.1, t.shape)
-    y = np.sin(2 * np.pi * 20 * t) + np.random.normal(0, 0.1, t.shape)
-    z = np.sin(2 * np.pi * 30 * t) + 0.5 * np.sin(2 * np.pi * (10 + 20) * t) + np.random.normal(0, 0.1, t.shape)
-
-    # Estimate cross-bispectrum
-    Bspec, waxis = bispectrumdx(x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1))
-
-    # Plot the results
-    plot_bispectrumdx(Bspec, waxis)
