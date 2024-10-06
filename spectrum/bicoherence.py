@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 
-
 import numpy as np
 import logging
 from scipy.linalg import hankel
-import scipy.io as sio
 import matplotlib.pyplot as plt
 from typing import Tuple, Union, Optional, Any
 
-
 from tools import nextpow2, flat_eq, make_arr, shape
-
 
 log = logging.getLogger(__file__)
 
@@ -23,38 +19,44 @@ def bicoherence(
     overlap: int = 50,
 ) -> Tuple[np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]]:
     """
-    Direct (FD) method for estimating bicoherence
-    Parameters:
-      y     - data vector or time-series
-      nfft - fft length [default = power of two > segsamp]
-             actual size used is power of two greater than 'nsamp'
-      wind - specifies the time-domain window to be applied to each
-             data segment; should be of length 'segsamp' (see below);
-        otherwise, the default Hanning window is used.
-      segsamp - samples per segment [default: such that we have 8 segments]
-              - if x is a matrix, segsamp is set to the number of rows
-      overlap - percentage overlap, allowed range [0,99]. [default = 50];
-              - if x is a matrix, overlap is set to 0.
+    Estimate bicoherence using the direct (FFT) method.
 
-    Output:
-      bic     - estimated bicoherence: an nfft x nfft array, with origin
-                at the center, and axes pointing down and to the right.
-      waxis   - vector of frequencies associated with the rows and columns
-                of bic;  sampling frequency is assumed to be 1.
+    Parameters:
+    -----------
+    y : np.ndarray
+        Input data vector or time-series. If y is a matrix, each column is treated as a separate realization.
+    nfft : int, optional
+        FFT length (default is 128). The actual size used is the next power of two greater than 'nsamp'.
+    wind : np.ndarray, optional
+        Time-domain window to be applied to each data segment (default is None, which uses a Hanning window).
+    nsamp : int, optional
+        Samples per segment (default is 0, which sets it to have 8 segments).
+    overlap : int, optional
+        Percentage overlap of segments, range [0, 99] (default is 50).
+
+    Returns:
+    --------
+    bic : np.ndarray
+        Estimated bicoherence: an nfft x nfft array, with origin at the center,
+        and axes pointing down and to the right.
+    waxis : np.ndarray
+        Vector of frequencies associated with the rows and columns of bic.
+        Sampling frequency is assumed to be 1.
+
+    Notes:
+    ------
+    The bicoherence is a normalized bispectrum that measures the degree of coupling
+    between triple combinations of frequency components.
     """
 
-    # Parameter checks
-
+    # Parameter checks and adjustments
     (ly, nrecs) = y.shape
     if ly == 1:
         y = y.reshape(1, -1)
-        ly = nrecs
-        nrecs = 1
+        ly, nrecs = nrecs, 1
 
     if nrecs > 1:
-        overlap = 0
-    if nrecs > 1:
-        nsamp = ly
+        overlap, nsamp = 0, ly
 
     if nrecs > 1 and nsamp <= 0:
         nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
@@ -65,30 +67,23 @@ def bicoherence(
     nadvance = nsamp - overlap
     nrecs = int(np.fix((ly * nrecs - overlap) / nadvance))
 
-    if not wind:
+    if wind is None:
         wind = np.hanning(nsamp)
 
-    try:
-        (rw, cw) = wind.shape
-    except ValueError:
-        (rw,) = wind.shape
-        cw = 1
-
-    if min(rw, cw) == 1 or max(rw, cw) == nsamp:
-        log.info("Segment size is " + str(nsamp))
-        log.info("Wind array is " + str(rw) + " by " + str(cw))
+    if wind.size != nsamp:
+        log.info(f"Segment size is {nsamp}")
+        log.info(f"Wind array is {wind.shape}")
         log.info("Using default Hanning window")
         wind = np.hanning(nsamp)
 
     wind = wind.reshape(1, -1)
 
     # Accumulate triple products
+    bic = np.zeros((nfft, nfft))
+    Pyy = np.zeros((nfft, 1))
 
-    bic = np.zeros([nfft, nfft])
-    Pyy = np.zeros([nfft, 1])
-
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))  # type: ignore
-    Yf12 = np.zeros([nfft, nfft])
+    mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
+    Yf12 = np.zeros((nfft, nfft))
     ind = np.arange(nsamp)
     y = y.ravel(order="F")
 
@@ -112,10 +107,31 @@ def bicoherence(
     bic = np.fft.fftshift(bic)
 
     if nfft % 2 == 0:
-        waxis = np.transpose(np.arange(-1 * nfft / 2, nfft / 2)) / nfft
+        waxis = np.transpose(np.arange(-nfft // 2, nfft // 2)) / nfft
     else:
-        waxis = np.transpose(np.arange(-1 * (nfft - 1) / 2, (nfft - 1) / 2 + 1)) / nfft
+        waxis = np.transpose(np.arange(-(nfft - 1) // 2, (nfft - 1) // 2 + 1)) / nfft
 
+    return bic, waxis
+
+
+def plot_bicoherence(
+    bic: np.ndarray[Any, np.dtype[Any]],
+    waxis: np.ndarray[Any, np.dtype[Any]],
+) -> None:
+    """
+    Plot the bicoherence estimate.
+
+    Parameters:
+    -----------
+    bic : np.ndarray
+        Estimated bicoherence array.
+    waxis : np.ndarray
+        Frequency axis values.
+
+    Returns:
+    --------
+    None
+    """
     cont = plt.contourf(waxis, waxis, bic, 100, cmap="viridis")
     plt.colorbar(cont)
     plt.title("Bicoherence estimated via the direct (FFT) method")
@@ -123,8 +139,24 @@ def bicoherence(
     plt.ylabel("f2")
 
     colmax, row = bic.max(0), bic.argmax(0)
-    maxval, col = colmax.max(0), colmax.argmax(0)
-    log.info("Max: bic(" + str(waxis[col]) + "," + str(waxis[col]) + ") = " + str(maxval))
+    maxval, col = colmax.max(), colmax.argmax()
+    log.info(f"Max: bic({waxis[col]:.6f}, {waxis[row[col]]:.6f}) = {maxval:.6f}")
     plt.show()
 
-    return (bic, waxis)
+
+if __name__ == "__main__":
+    # Example usage
+    # Generate some sample data
+    t = np.linspace(0, 10, 1000)
+    y = (
+        np.sin(2 * np.pi * 10 * t)
+        + 0.5 * np.sin(2 * np.pi * 20 * t)
+        + 0.3 * np.sin(2 * np.pi * 30 * t)
+        + np.random.normal(0, 0.1, t.shape)
+    )
+
+    # Estimate bicoherence
+    bic, waxis = bicoherence(y.reshape(-1, 1))
+
+    # Plot the results
+    plot_bicoherence(bic, waxis)
