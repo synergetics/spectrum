@@ -1,28 +1,44 @@
+import scipy.io as sio
+import numpy as np
+from spectrum import cum4x
+
+
+def test_specific():
+    y = sio.loadmat("./tests/demo/ma1.mat")["y"]
+
+    biased = cum4x(y, y, y, y, 3, 100, 0, "biased").flatten().tolist()
+    unbiased = cum4x(y, y, y, y, 3, 100, 0, "unbiased").flatten().tolist()
+
+    print(biased)
+    print(unbiased)
+
+    assert biased == [
+        -0.5234348330742729,
+        -0.43056952713986557,
+        1.1665058630740923,
+        3.2158320429550487,
+        1.980876165048158,
+        -0.38022387563210686,
+        -1.05836041124719,
+    ]
+
+    assert unbiased == [
+        -0.5396235392518276,
+        -0.43935666034680176,
+        1.1782887505798905,
+        3.2158320429550487,
+        2.0008850152001614,
+        -0.38798354656337414,
+        -1.091093207471329,
+    ]
+
+
 def test_cum4x():
-    """
-    Test function for fourth-order cross-cumulant estimation.
-    """
-    # Generate test signals: four related non-Gaussian processes
-    N = 10000
-    np.random.seed(0)
-    e = np.random.randn(N) ** 3  # Non-Gaussian noise
-    w = np.zeros(N)
-    x = np.zeros(N)
-    y = np.zeros(N)
-    z = np.zeros(N)
-    for t in range(1, N):
-        w[t] = 0.5 * w[t - 1] + e[t]
-        x[t] = 0.3 * x[t - 1] + 0.4 * w[t - 1] + 0.5 * e[t]
-        y[t] = 0.4 * y[t - 1] + 0.3 * w[t - 2] + 0.2 * x[t - 1] + 0.3 * e[t]
-        z[t] = 0.2 * z[t - 1] + 0.1 * w[t - 3] + 0.2 * x[t - 2] + 0.3 * y[t - 1] + 0.2 * e[t]
-
-    # Estimate fourth-order cross-cumulants
-    maxlag = 20
-    k1_k2_values = [(0, 0), (5, 0), (0, 5), (5, 5)]
-
-    for k1, k2 in k1_k2_values:
-        y_cum = cum4x(w, x, y, z, maxlag=maxlag, nsamp=N, flag="unbiased", k1=k1, k2=k2)
-
-        # Plot results
-        lags = np.arange(-maxlag, maxlag + 1)
-        plot_fourth_order_cross_cumulant(lags, y_cum, k1, k2, title="Estimated Fourth-Order Cross-Cumulant")
+    t = np.linspace(0, 10, 1000)
+    w = np.sin(2 * np.pi * 5 * t) + 0.1 * np.random.randn(len(t))
+    x = np.sin(2 * np.pi * 10 * t) + 0.1 * np.random.randn(len(t))
+    y = np.sin(2 * np.pi * 15 * t) + 0.1 * np.random.randn(len(t))
+    z = np.sin(2 * np.pi * 20 * t) + 0.1 * np.random.randn(len(t))
+    w, x, y, z = w.reshape(-1, 1), x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)  # Reshape to 2D arrays
+    cum4 = cum4x(w, x, y, z, maxlag=50, nsamp=256, overlap=50, k1=5, k2=10)
+    assert cum4.shape == (101, 1)
