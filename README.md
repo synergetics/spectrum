@@ -1,4 +1,4 @@
-# Higher Order Spectral Analysis (HOSA) Toolkit
+# Higher Order Spectral Analysis Toolkit
 
 This package provides a comprehensive set of tools for higher-order spectral
 analysis in Python. It includes functions for estimating bicoherence,
@@ -9,7 +9,7 @@ bispectrum, and various orders of cumulants.
 You can install the HOSA toolkit using pip:
 
 ```bash
-pip install spectrum
+pip install higher-spectrum
 ```
 
 ## Contents

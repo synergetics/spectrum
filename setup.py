@@ -9,8 +9,8 @@ with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="spectrum",
-    version="1.0.0",
+    name="higher-spectrum",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=["numpy>=1.18.0", "scipy>=1.4.0", "matplotlib>=3.1.0"],
     include_package_data=True,
