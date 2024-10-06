@@ -2,12 +2,10 @@
 
 import numpy as np
 import logging
-from scipy.linalg import hankel
-from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Union, Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import nextpow2, make_arr
 
 np.set_printoptions(linewidth=120)
 
@@ -154,7 +152,7 @@ def bispectrumi(
             )
 
     # Compute 2d-fft, and shift and rotate for proper orientation
-    Bspec = np.fft.fft2(wcmat, (nfft, nfft))  # type: ignore
+    Bspec = np.fft.fft2(wcmat, (nfft, nfft))
     Bspec = np.fft.fftshift(Bspec)  # axes d and r; orig at ctr
 
     if nfft % 2 == 0:

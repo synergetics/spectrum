@@ -3,12 +3,9 @@
 
 import numpy as np
 import logging
-from scipy.linalg import hankel
-import scipy.io as sio
-import matplotlib.pyplot as plt
-from typing import Any, Optional
+from typing import Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import shape
 from cum2est import cum2est
 from cum2x import cum2x
 
@@ -84,7 +81,7 @@ def cum4est(
     mlag = max(mlag, abs(k1 - k2))
     mlag1 = mlag + 1
     nlag = maxlag
-    m2k2 = np.zeros([2 * maxlag + 1, 1])
+    np.zeros([2 * maxlag + 1, 1])
 
     if np.any(np.any(np.imag(y) != 0)):
         complex_flag = 1

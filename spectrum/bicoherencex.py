@@ -6,7 +6,7 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import nextpow2, flat_eq
 
 log = logging.getLogger(__file__)
 

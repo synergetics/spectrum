@@ -3,12 +3,8 @@
 
 import numpy as np
 import logging
-from scipy.linalg import hankel
-import scipy.io as sio
-import matplotlib.pyplot as plt
 from typing import Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
 from cum2x import cum2x
 
 

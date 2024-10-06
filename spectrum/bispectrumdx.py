@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Union, Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import nextpow2, flat_eq
 
 log = logging.getLogger(__file__)
 
@@ -104,7 +104,7 @@ def bispectrumdx(
             opwind = opwind * Hex
             opwind = opwind * (4 * mwind**2) / (7 * np.pi**2)
         else:
-            opwind = 1  # type: ignore
+            opwind = 1
     elif isinstance(wind, np.ndarray) and wind.ndim == 1:
         windf = np.concatenate((wind[:0:-1], wind))
         opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(wind), wind)
@@ -113,11 +113,11 @@ def bispectrumdx(
         winsize = wind.shape[0]
         if wind.shape[0] != wind.shape[1]:
             log.warning("2-D window is not square: window ignored")
-            opwind = 1  # type: ignore
+            opwind = 1
             winsize = wind.shape[0]
         elif wind.shape[0] % 2 == 0:
             log.warning("2-D window does not have odd length: window ignored")
-            opwind = 1  # type: ignore
+            opwind = 1
             winsize = wind.shape[0]
         else:
             opwind = wind

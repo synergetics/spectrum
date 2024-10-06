@@ -3,12 +3,9 @@
 
 import numpy as np
 import logging
-from scipy.linalg import hankel
-import scipy.io as sio
-import matplotlib.pyplot as plt
 from typing import Any
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import make_arr, shape
 
 
 log = logging.getLogger(__file__)
@@ -53,7 +50,7 @@ def cum2est(
 
     (n1, n2) = shape(y, 2)
     N = n1 * n2
-    overlap = np.fix(overlap / 100 * nsamp)  # type: ignore
+    overlap = np.fix(overlap / 100 * nsamp)
     nrecord = np.fix((N - overlap) / (nsamp - overlap))
     nadvance = nsamp - overlap
 

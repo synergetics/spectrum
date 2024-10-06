@@ -5,9 +5,9 @@ import logging
 from scipy.linalg import hankel
 from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
-from typing import Tuple, Optional, Any, Union
+from typing import Tuple, Any, Union
 
-from tools import nextpow2, flat_eq, make_arr, shape
+from tools import nextpow2, flat_eq
 
 log = logging.getLogger(__file__)
 
@@ -87,7 +87,7 @@ def bispectrumd(
             opwind = opwind * Hex
             opwind = opwind * (4 * mwind**2) / (7 * np.pi**2)
         else:
-            opwind = 1  # type: ignore
+            opwind = 1
     elif isinstance(wind, np.ndarray) and wind.ndim == 1:
         windf = np.concatenate((wind[:0:-1], wind))
         opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(wind), wind)
@@ -97,12 +97,12 @@ def bispectrumd(
         if wind.shape[0] != wind.shape[1]:
             log.info("2-D window is not square: window ignored")
             wind = 1
-            winsize = wind.shape[0]  # type: ignore
+            winsize = wind.shape[0]
         if winsize % 2 == 0:
             log.info("2-D window does not have odd length: window ignored")
             wind = 1
-            winsize = wind.shape[0]  # type: ignore
-        opwind = wind  # type: ignore
+            winsize = wind.shape[0]
+        opwind = wind
 
     # Accumulate triple products
     Bspec = np.zeros((nfft, nfft))
