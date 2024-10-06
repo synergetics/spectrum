@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 
-
 import numpy as np
 from scipy.linalg import hankel
 import logging
-import scipy.io as sio
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
 from tools import nextpow2, flat_eq, make_arr, shape
-
 
 log = logging.getLogger(__file__)
 
@@ -24,85 +21,84 @@ def bicoherencex(
     overlap: int = 50,
 ) -> Tuple[np.ndarray[Any, np.dtype[Any]], np.ndarray[Any, np.dtype[Any]]]:
     """
-    Direct (FD) method for estimating cross-bicoherence
-    Parameters:
-      w,x,y - data vector or time-series
-            - should have identical dimensions
-      nfft - fft length [default = power of two > nsamp]
-             actual size used is power of two greater than 'nsamp'
-      wind - specifies the time-domain window to be applied to each
-             data segment; should be of length 'segsamp' (see below);
-        otherwise, the default Hanning window is used.
-      segsamp - samples per segment [default: such that we have 8 segments]
-              - if x is a matrix, segsamp is set to the number of rows
-      overlap - percentage overlap, 0 to 99  [default = 50]
-              - if y is a matrix, overlap is set to 0.
+    Estimate cross-bicoherence using the direct (FFT) method.
 
-    Output:
-      bic     - estimated cross-bicoherence: an nfft x nfft array, with
-                origin at center, and axes pointing down and to the right.
-      waxis   - vector of frequencies associated with the rows and columns
-                of bic;  sampling frequency is assumed to be 1.
+    Parameters:
+    -----------
+    w : np.ndarray
+        First input data vector or time-series.
+    x : np.ndarray
+        Second input data vector or time-series.
+    y : np.ndarray
+        Third input data vector or time-series.
+        w, x, and y should have identical dimensions.
+    nfft : int, optional
+        FFT length (default is 128). The actual size used is the next power of two greater than 'nsamp'.
+    wind : np.ndarray, optional
+        Time-domain window to be applied to each data segment (default is None, which uses a Hanning window).
+    nsamp : int, optional
+        Samples per segment (default is 0, which sets it to have 8 segments).
+    overlap : int, optional
+        Percentage overlap of segments, range [0, 99] (default is 50).
+
+    Returns:
+    --------
+    bic : np.ndarray
+        Estimated cross-bicoherence: an nfft x nfft array, with origin at the center,
+        and axes pointing down and to the right.
+    waxis : np.ndarray
+        Vector of frequencies associated with the rows and columns of bic.
+        Sampling frequency is assumed to be 1.
+
+    Notes:
+    ------
+    The cross-bicoherence is a normalized cross-bispectrum that measures the degree of coupling
+    between triple combinations of frequency components from three different signals.
     """
 
     if w.shape != x.shape or x.shape != y.shape:
-        raise ValueError("w, x and y should have identical dimentions")
+        raise ValueError("w, x and y should have identical dimensions")
 
     (ly, nrecs) = y.shape
     if ly == 1:
-        ly = nrecs
-        nrecs = 1
+        ly, nrecs = nrecs, 1
         w = w.reshape(1, -1)
         x = x.reshape(1, -1)
         y = y.reshape(1, -1)
 
-    if not nfft:
-        nfft = 128
-
-    if not overlap:
-        overlap = 50
-    overlap = max(0, min(overlap, 99))
-    if nrecs > 1:
-        overlap = 0
-    if not nsamp:
-        nsamp = 0
-    if nrecs > 1:
-        nsamp = ly
-    if nrecs == 1 and nsamp <= 0:
-        nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
     if nfft < nsamp:
         nfft = 2 ** nextpow2(nsamp)
+
+    overlap = max(0, min(overlap, 99))
+    if nrecs > 1:
+        overlap, nsamp = 0, ly
+    if nrecs == 1 and nsamp <= 0:
+        nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
 
     overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
     nrecs = int(np.fix((ly * nrecs - overlap) / nadvance))
 
-    if not wind:
+    if wind is None:
         wind = np.hanning(nsamp)
 
-    try:
-        (rw, cw) = wind.shape
-    except ValueError:
-        (rw,) = wind.shape
-        cw = 1
-
-    if min(rw, cw) != 1 or max(rw, cw) != nsamp:
-        log.info("Segment size is " + str(nsamp))
-        log.info("Wind array is " + str(rw) + " by " + str(cw))
+    if wind.size != nsamp:
+        log.info(f"Segment size is {nsamp}")
+        log.info(f"Wind array is {wind.shape}")
         log.info("Using default Hanning window")
         wind = np.hanning(nsamp)
 
     wind = wind.reshape(1, -1)
 
     # Accumulate triple products
-    bic = np.zeros([nfft, nfft])
-    Pyy = np.zeros([nfft, 1])
-    Pww = np.zeros([nfft, 1])
-    Pxx = np.zeros([nfft, 1])
+    bic = np.zeros((nfft, nfft))
+    Pyy = np.zeros((nfft, 1))
+    Pww = np.zeros((nfft, 1))
+    Pxx = np.zeros((nfft, 1))
 
-    mask = hankel(np.arange(nfft), np.array([nfft - 1] + range(nfft - 1)))  # type: ignore
-    Yf12 = np.zeros([nfft, nfft])
-    ind = np.transpose(np.arange(nsamp))
+    mask = hankel(np.arange(nfft), np.array([nfft - 1] + list(range(nfft - 1))))
+    Yf12 = np.zeros((nfft, nfft))
+    ind = np.arange(nsamp)
     w = w.ravel(order="F")
     x = x.ravel(order="F")
     y = y.ravel(order="F")
@@ -140,21 +136,54 @@ def bicoherencex(
     bic = abs(bic) ** 2 / ((Pww * np.transpose(Pxx)) * mask)
     bic = np.fft.fftshift(bic)
 
-    # Contour plot of magnitude bispectrum
     if nfft % 2 == 0:
-        waxis = np.transpose(np.arange(-1 * nfft / 2, nfft / 2)) / nfft
+        waxis = np.transpose(np.arange(-nfft // 2, nfft // 2)) / nfft
     else:
-        waxis = np.transpose(np.arange(-1 * (nfft - 1) / 2, (nfft - 1) / 2 + 1)) / nfft
+        waxis = np.transpose(np.arange(-(nfft - 1) // 2, (nfft - 1) // 2 + 1)) / nfft
 
+    return bic, waxis
+
+
+def plot_bicoherencex(
+    bic: np.ndarray[Any, np.dtype[Any]],
+    waxis: np.ndarray[Any, np.dtype[Any]],
+) -> None:
+    """
+    Plot the cross-bicoherence estimate.
+
+    Parameters:
+    -----------
+    bic : np.ndarray
+        Estimated cross-bicoherence array.
+    waxis : np.ndarray
+        Frequency axis values.
+
+    Returns:
+    --------
+    None
+    """
     cont = plt.contourf(waxis, waxis, bic, 100, cmap="viridis")
     plt.colorbar(cont)
-    plt.title("Bicoherence estimated via the direct (FFT) method")
+    plt.title("Cross-Bicoherence estimated via the direct (FFT) method")
     plt.xlabel("f1")
     plt.ylabel("f2")
 
     colmax, row = bic.max(0), bic.argmax(0)
-    maxval, col = colmax.max(0), colmax.argmax(0)
-    log.info("Max: bic(" + str(waxis[col]) + "," + str(waxis[col]) + ") = " + str(maxval))
+    maxval, col = colmax.max(), colmax.argmax()
+    log.info(f"Max: bic({waxis[col]:.6f}, {waxis[row[col]]:.6f}) = {maxval:.6f}")
     plt.show()
 
-    return (bic, waxis)
+
+if __name__ == "__main__":
+    # Example usage
+    # Generate some sample data
+    t = np.linspace(0, 10, 1000)
+    w = np.sin(2 * np.pi * 10 * t) + np.random.normal(0, 0.1, t.shape)
+    x = np.sin(2 * np.pi * 20 * t) + np.random.normal(0, 0.1, t.shape)
+    y = np.sin(2 * np.pi * 30 * t) + 0.5 * np.sin(2 * np.pi * (10 + 20) * t) + np.random.normal(0, 0.1, t.shape)
+
+    # Estimate cross-bicoherence
+    bic, waxis = bicoherencex(w.reshape(-1, 1), x.reshape(-1, 1), y.reshape(-1, 1))
+
+    # Plot the results
+    plot_bicoherencex(bic, waxis)
