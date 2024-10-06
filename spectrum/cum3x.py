@@ -25,23 +25,43 @@ def cum3x(
     k1: int = 0,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    Third-order cross-cumulants.
-    Parameters:
-        x,y,z  - data vectors/matrices with identical dimensions
-                 if x,y,z are matrices, rather than vectors, columns are
-                 assumed to correspond to independent realizations,
-                 overlap is set to 0, and samp_seg to the row dimension.
-        maxlag - maximum lag to be computed    [default = 0]
-      samp_seg - samples per segment  [default = data_length]
-       overlap - percentage overlap of segments [default = 0]
-                 overlap is clipped to the allowed range of [0,99].
-         flag : 'biased', biased estimates are computed  [default]
-                'unbiased', unbiased estimates are computed.
-            k1: the fixed lag in c3(m,k1): defaults to 0
+    Estimate the third-order cross-cumulants of three signals.
 
-    Output:
-         y_cum:  estimated third-order cross cumulant,
-                 E x^*(n)y(n+m)z(n+k1),   -maxlag <= m <= maxlag
+    Parameters:
+    -----------
+    x : np.ndarray[Any, np.dtype[Any]]
+        First input data vector or matrix.
+    y : np.ndarray[Any, np.dtype[Any]]
+        Second input data vector or matrix.
+    z : np.ndarray[Any, np.dtype[Any]]
+        Third input data vector or matrix.
+        x, y, and z must have identical dimensions.
+    maxlag : int, optional
+        Maximum lag to be computed (default is 0).
+    nsamp : int, optional
+        Samples per segment (default is 0, which uses the entire data length).
+    overlap : int, optional
+        Percentage overlap of segments (default is 0).
+        Overlap is clipped to the allowed range of [0,99].
+    flag : str, optional
+        'biased': biased estimates are computed (default)
+        'unbiased': unbiased estimates are computed.
+    k1 : int, optional
+        The fixed lag in C3(m,k1) (default is 0).
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated third-order cross-cumulant,
+        E[x^*(n)y(n+m)z(n+k1)], -maxlag <= m <= maxlag
+
+    Notes:
+    ------
+    The third-order cross-cumulant is a higher-order statistic that can reveal
+    non-linear dependencies between three signals that are not captured by
+    cross-correlation functions.
+    If x, y, and z are matrices, columns are assumed to correspond to independent realizations,
+    overlap is set to 0, and samp_seg to the row dimension.
     """
 
     (lx, nrecs) = x.shape

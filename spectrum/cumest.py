@@ -27,20 +27,52 @@ def cumest(
     k2: int = 0,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    Second-, third- or fourth-order cumulants.
-    Parameters:
-             y - time-series  - should be a vector
-        norder - cumulant order: 2, 3 or 4 [default = 2]
-        maxlag - maximum cumulant lag to compute [default = 0]
-      samp_seg - samples per segment  [default = data_length]
-       overlap - percentage overlap of segments [default = 0]
-                 overlap is clipped to the allowed range of [0,99].
-         flag  - 'biased' or 'unbiased'  [default = 'biased']
-        k1,k2  - specify the slice of 3rd or 4th order cumulants
+    Estimate the 2nd, 3rd, or 4th order cumulants of a time series.
 
-    Output:
-        y_cum  - C2(m) or C3(m,k1) or C4(m,k1,k2),  -maxlag <= m <= maxlag
-                 depending upon the cumulant order selected
+    This function serves as a unified interface for estimating various orders of cumulants.
+
+    Parameters:
+    -----------
+    y : np.ndarray[Any, np.dtype[Any]]
+        Input time series data. Should be a vector (column or row).
+    norder : int, optional
+        Cumulant order to compute. Must be 2, 3, or 4 (default is 2).
+    maxlag : int, optional
+        Maximum cumulant lag to compute (default is 0).
+    nsamp : Optional[int], optional
+        Samples per segment (default is None, which uses the entire data length).
+    overlap : int, optional
+        Percentage overlap of segments. Range: [0, 99] (default is 0).
+    flag : str, optional
+        'biased' or 'unbiased' (default is 'biased').
+    k1 : int, optional
+        Specify the slice of 3rd or 4th order cumulants (default is 0).
+    k2 : int, optional
+        Specify the slice of 4th order cumulants (default is 0).
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated cumulant. The interpretation depends on the order:
+        - For norder=2: C2(m), -maxlag <= m <= maxlag
+        - For norder=3: C3(m,k1), -maxlag <= m <= maxlag
+        - For norder=4: C4(m,k1,k2), -maxlag <= m <= maxlag
+
+    Raises:
+    -------
+    ValueError
+        If norder is not 2, 3, or 4, or if maxlag is negative.
+
+    Notes:
+    ------
+    - For norder=2, this function computes the autocorrelation function.
+    - For norder=3, it computes a slice of the third-order cumulant.
+    - For norder=4, it computes a slice of the fourth-order cumulant.
+    - The function uses the overlapped segment method for estimation.
+
+    See Also:
+    ---------
+    cum2est, cum3est, cum4est : Individual functions for specific cumulant orders.
     """
 
     (ksamp, nrecs) = y.shape

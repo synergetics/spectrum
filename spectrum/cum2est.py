@@ -22,19 +22,33 @@ def cum2est(
     flag: str,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    CUM2EST Covariance function.
-    Should be involed via "CUMEST" for proper parameter checks.
-    Parameters:
-             y: input data vector (column)
-        maxlag: maximum lag to be computed
-      samp_seg: samples per segment (<=0 means no segmentation)
-       overlap: percentage overlap of segments
-          flag: 'biased', biased estimates are computed
-                'unbiased', unbiased estimates are computed.
+    Estimate the covariance (2nd order cumulant) function.
 
-    Output:
-         y_cum: estimated covariance,
-                C2(m)  -maxlag <= m <= maxlag
+    This function should be invoked via "CUMEST" for proper parameter checks.
+
+    Parameters:
+    -----------
+    y : np.ndarray[Any, np.dtype[Any]]
+        Input data vector (column).
+    maxlag : int
+        Maximum lag to be computed.
+    nsamp : int
+        Samples per segment.
+    overlap : int
+        Percentage overlap of segments.
+    flag : str
+        'biased': biased estimates are computed
+        'unbiased': unbiased estimates are computed.
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated covariance, C2(m) for -maxlag <= m <= maxlag.
+
+    Notes:
+    ------
+    The covariance function is a measure of the linear dependence between
+    two values of a signal that are separated by a time lag.
     """
 
     (n1, n2) = shape(y, 2)

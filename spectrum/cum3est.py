@@ -23,20 +23,36 @@ def cum3est(
     k1: int,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    UM3EST Third-order cumulants.
-    Should be invoked via "CUMEST" for proper parameter checks
-    Parameters:
-             y: input data vector (column)
-        maxlag: maximum lag to be computed
-      samp_seg: samples per segment
-       overlap: percentage overlap of segments
-         flag : 'biased', biased estimates are computed  [default]
-                'unbiased', unbiased estimates are computed.
-            k1: the fixed lag in c3(m,k1): see below
+    Estimate the third-order cumulants of a signal.
 
-    Output:
-         y_cum:  estimated third-order cumulant,
-                 C3(m,k1)  -maxlag <= m <= maxlag
+    This function should be invoked via "CUMEST" for proper parameter checks.
+
+    Parameters:
+    -----------
+    y : np.ndarray[Any, np.dtype[Any]]
+        Input data vector (column).
+    maxlag : int
+        Maximum lag to be computed.
+    nsamp : int
+        Samples per segment.
+    overlap : int
+        Percentage overlap of segments.
+    flag : str
+        'biased': biased estimates are computed
+        'unbiased': unbiased estimates are computed.
+    k1 : int
+        The fixed lag in C3(m,k1).
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated third-order cumulant, C3(m,k1) for -maxlag <= m <= maxlag.
+
+    Notes:
+    ------
+    The third-order cumulant is a higher-order statistic that can reveal
+    non-linear dependencies in a signal that are not captured by the
+    autocorrelation function.
     """
 
     (n1, n2) = np.shape(y)

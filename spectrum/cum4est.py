@@ -26,24 +26,37 @@ def cum4est(
     k2: int = 0,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    CUM4EST Fourth-order cumulants.
-    Parameters:
-            Should be invoked via CUMEST for proper parameter checks
-            y_cum = cum4est (y, maxlag, samp_seg, overlap, flag, k1, k2)
-            Computes sample estimates of fourth-order cumulants
-            via the overlapped segment method.
-            y_cum = cum4est (y, maxlag, samp_seg, overlap, flag, k1, k2)
-                   y: input data vector (column)
-              maxlag: maximum lag
-            samp_seg: samples per segment
-             overlap: percentage overlap of segments
-               flag : 'biased', biased estimates are computed
-                    : 'unbiased', unbiased estimates are computed.
-        k1,k2 : the fixed lags in C3(m,k1) or C4(m,k1,k2)
+    Estimate the fourth-order cumulants of a signal.
 
-    Output:
-        y_cum : estimated fourth-order cumulant slice
-                C4(m,k1,k2)  -maxlag <= m <= maxlag
+    Parameters:
+    -----------
+    y : np.ndarray[Any, np.dtype[Any]]
+        Input data vector or time-series (column vector).
+    maxlag : int, optional
+        Maximum lag to be computed (default is 0).
+    nsamp : int, optional
+        Samples per segment (default is 0, which uses the entire data length).
+    overlap : int, optional
+        Percentage overlap of segments (default is 0).
+        Overlap is clipped to the allowed range of [0,99].
+    flag : str, optional
+        'biased': biased estimates are computed (default)
+        'unbiased': unbiased estimates are computed.
+    k1 : int, optional
+        The fixed lag in C4(m,k1,k2) (default is 0).
+    k2 : int, optional
+        The fixed lag in C4(m,k1,k2) (default is 0).
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated fourth-order cumulant slice C4(m,k1,k2), -maxlag <= m <= maxlag
+
+    Notes:
+    ------
+    The fourth-order cumulant is a higher-order statistic that can reveal
+    non-linear dependencies in a signal that are not captured by lower-order
+    cumulants. It's particularly useful for analyzing non-Gaussian processes.
     """
 
     (n1, n2) = shape(y, 2)

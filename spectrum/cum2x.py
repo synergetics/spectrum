@@ -23,22 +23,38 @@ def cum2x(
     flag: str = "biased",
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    Cross-covariance
-    Parameters:
-        x,y    - data vectors/matrices with identical dimensions
-                 if x,y are matrices, rather than vectors, columns are
-                 assumed to correspond to independent realizations,
-                 overlap is set to 0, and samp_seg to the row dimension.
-        maxlag - maximum lag to be computed    [default = 0]
-      samp_seg - samples per segment  [default = data_length]
-       overlap - percentage overlap of segments [default = 0]
-                 overlap is clipped to the allowed range of [0,99].
-         flag  - 'biased', biased estimates are computed  [default]
-                'unbiased', unbiased estimates are computed.
+    Estimate the cross-covariance (2nd order cross-cumulant) function.
 
-    Output:
-         y_cum - estimated cross-covariance
-                 E x^*(n)y(n+m),   -maxlag <= m <= maxlag
+    Parameters:
+    -----------
+    x : np.ndarray[Any, np.dtype[Any]]
+        First input data vector or matrix.
+    y : np.ndarray[Any, np.dtype[Any]]
+        Second input data vector or matrix.
+        x and y must have identical dimensions.
+    maxlag : int, optional
+        Maximum lag to be computed (default is 0).
+    nsamp : int, optional
+        Samples per segment (default is 0, which uses the entire data length).
+    overlap : int, optional
+        Percentage overlap of segments (default is 0).
+        Overlap is clipped to the allowed range of [0,99].
+    flag : str, optional
+        'biased': biased estimates are computed (default)
+        'unbiased': unbiased estimates are computed.
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated cross-covariance,
+        E[x^*(n)y(n+m)], -maxlag <= m <= maxlag
+
+    Notes:
+    ------
+    The cross-covariance function is a measure of the linear dependence between
+    two signals as a function of the time lag between them.
+    If x and y are matrices, columns are assumed to correspond to independent realizations,
+    overlap is set to 0, and samp_seg to the row dimension.
     """
 
     (lx, nrecs) = x.shape

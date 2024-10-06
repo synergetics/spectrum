@@ -28,23 +28,37 @@ def cum4x(
     k2: int = 0,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     """
-    Fourth-order cross-cumulants.
-    Parameters:
-       w,x,y,z  - data vectors/matrices with identical dimensions
-                 if w,x,y,z are matrices, rather than vectors, columns are
-                 assumed to correspond to independent realizations,
-                 overlap is set to 0, and samp_seg to the row dimension.
-        maxlag - maximum lag to be computed    [default = 0]
-      samp_seg - samples per segment  [default = data_length]
-       overlap - percentage overlap of segments [default = 0]
-                 overlap is clipped to the allowed range of [0,99].
-         flag : 'biased', biased estimates are computed  [default]
-                'unbiased', unbiased estimates are computed.
-        k1,k2 : the fixed lags in C4(m,k1,k2) defaults to 0
+    Estimate the fourth-order cross-cumulants of four signals.
 
-    Output:
-         y_cum:  estimated fourth-order cross cumulant,
-               c4(t1,t2,t3) := cum( w^*(t), x(t+t1), y(t+t2), z^*(t+t3) )
+    Parameters:
+    -----------
+    w, x, y, z : np.ndarray[Any, np.dtype[Any]]
+        Input data vectors or matrices with identical dimensions.
+        If matrices, columns are assumed to correspond to independent realizations.
+    maxlag : int, optional
+        Maximum lag to be computed (default is 0).
+    nsamp : int, optional
+        Samples per segment (default is 0, which uses the entire data length).
+    overlap : int, optional
+        Percentage overlap of segments (default is 0).
+        Overlap is clipped to the allowed range of [0,99].
+    flag : str, optional
+        'biased': biased estimates are computed (default)
+        'unbiased': unbiased estimates are computed.
+    k1, k2 : int, optional
+        The fixed lags in C4(m,k1,k2) (default is 0 for both).
+
+    Returns:
+    --------
+    y_cum : np.ndarray[Any, np.dtype[Any]]
+        Estimated fourth-order cross-cumulant,
+        c4(t1,t2,t3) := cum( w^*(t), x(t+t1), y(t+t2), z^*(t+t3) )
+
+    Notes:
+    ------
+    The fourth-order cross-cumulant is a higher-order statistic that can reveal
+    non-linear dependencies between four signals that are not captured by
+    lower-order statistics.
     """
 
     (lx, nrecs) = w.shape
