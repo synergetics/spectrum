@@ -5,7 +5,7 @@ import numpy as np
 import logging
 from typing import Any
 
-from cum2x import cum2x
+from .cum2x import cum2x
 
 
 log = logging.getLogger(__file__)

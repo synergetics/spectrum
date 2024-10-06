@@ -5,8 +5,8 @@ import numpy as np
 import logging
 from typing import Any, Optional
 
-from cum2est import cum2est
-from cum3est import cum3est
+from .cum2est import cum2est
+from .cum3est import cum3est
 
 log = logging.getLogger(__file__)
 
@@ -90,12 +90,15 @@ def cumest(
         overlap = 0
     overlap = max(0, min(overlap, 99))
 
+    if nsamp is None:
+        raise ValueError("Number of samples is None")
+
     # estimate the cumulants
     if norder == 2:
         y_cum = cum2est(y, maxlag, nsamp, overlap, flag)
     elif norder == 3:
         y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1)
     elif norder == 4:
-        y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1, k2)
+        y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1)
 
     return y_cum

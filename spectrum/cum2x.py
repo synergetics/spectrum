@@ -5,7 +5,7 @@ import numpy as np
 import logging
 from typing import Any
 
-from tools import make_arr
+from spectrum import make_arr
 
 
 log = logging.getLogger(__file__)

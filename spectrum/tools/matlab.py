@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-# type: ignore
 
 import numpy as np
-import os
+from typing import Any, List
 
 
-def nextpow2(num):
+def nextpow2(num: int) -> int:
     """
     Returns the next highest power of 2 from the given value.
     Example
@@ -24,7 +23,7 @@ def nextpow2(num):
     return npow
 
 
-def flat_eq(x, y):
+def flat_eq(x: np.ndarray[Any, np.dtype[Any]], y: np.ndarray[Any, np.dtype[Any]]) -> np.ndarray[Any, np.dtype[Any]]:
     """
     Emulate MATLAB's assignment of the form
     x(:) = y
@@ -34,7 +33,7 @@ def flat_eq(x, y):
     return z.reshape(x.shape)
 
 
-def make_arr(arrs, axis=0):
+def make_arr(arrs: List[np.ndarray[Any, np.dtype[Any]]], axis: int = 0):
     """
     Create arrays like MATLAB does
     python                                 MATLAB
@@ -53,7 +52,7 @@ def make_arr(arrs, axis=0):
     return np.concatenate(a, axis)
 
 
-def shape(o, n):
+def shape(o: np.ndarray[Any, np.dtype[Any]], n: int):
     """
     Behave like MATLAB's shape
     """
@@ -63,10 +62,3 @@ def shape(o, n):
         return s + x
     else:
         return s
-
-
-def here(f=__file__):
-    """
-    This script's directory
-    """
-    return os.path.dirname(os.path.realpath(f))

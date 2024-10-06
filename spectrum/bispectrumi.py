@@ -5,7 +5,7 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Union, Any
 
-from tools import nextpow2, make_arr
+from spectrum import nextpow2, make_arr
 
 np.set_printoptions(linewidth=120)
 

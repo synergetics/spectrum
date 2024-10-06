@@ -5,9 +5,9 @@ import numpy as np
 import logging
 from typing import Any
 
-from tools import shape
-from cum2est import cum2est
-from cum2x import cum2x
+from spectrum import shape
+from .cum2est import cum2est
+from .cum2x import cum2x
 
 
 log = logging.getLogger(__file__)
