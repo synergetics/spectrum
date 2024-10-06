@@ -5,7 +5,7 @@ import numpy as np
 import logging
 from typing import Any
 
-from spectrum import make_arr
+from .tools.matlab import make_arr
 
 
 log = logging.getLogger(__file__)

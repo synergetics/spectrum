@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-from typing import Any, List
+from typing import Any
 
 
 def nextpow2(num: int) -> int:
@@ -33,7 +33,7 @@ def flat_eq(x: np.ndarray[Any, np.dtype[Any]], y: np.ndarray[Any, np.dtype[Any]]
     return z.reshape(x.shape)
 
 
-def make_arr(arrs: List[np.ndarray[Any, np.dtype[Any]]], axis: int = 0):
+def make_arr(arrs: Any, axis: int = 0):
     """
     Create arrays like MATLAB does
     python                                 MATLAB

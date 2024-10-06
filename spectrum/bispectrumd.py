@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Any, Union
 
-from spectrum import nextpow2, flat_eq
+from .tools.matlab import nextpow2, flat_eq
 
 log = logging.getLogger(__file__)
 

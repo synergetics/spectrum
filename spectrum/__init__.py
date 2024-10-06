@@ -36,7 +36,7 @@ from .cum3x import cum3x
 from .cum4est import cum4est
 from .cum4x import cum4x
 from .cumest import cumest
-from spectrum.matlab import nextpow2, flat_eq, make_arr, shape
+from .tools.matlab import nextpow2, flat_eq, make_arr, shape
 
 __all__ = [
     "bicoherence",

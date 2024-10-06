@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from spectrum import nextpow2, flat_eq
+from .tools.matlab import nextpow2, flat_eq
 
 log = logging.getLogger(__file__)
 
