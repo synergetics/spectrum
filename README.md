@@ -6,7 +6,7 @@ bispectrum, and various orders of cumulants.
 
 ## Installation
 
-You can install the HOSA toolkit using pip:
+You can install the toolkit using pip:
 
 ```bash
 pip install higher-spectrum
@@ -112,15 +112,6 @@ plot_fourth_order_cross_cumulant(np.arange(-20, 21), c4, k1=0, k2=0)
 - NumPy
 - SciPy
 - Matplotlib
-
-## Contributing
-
-Contributions to the HOSA toolkit are welcome! Please feel free to submit a Pull
-Request.
-
-## License
-
-This project is licensed under the MIT License.
 
 ## Acknowledgements
 
