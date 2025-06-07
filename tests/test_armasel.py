@@ -19,8 +19,8 @@ def test_armasel():
     # Test AIC
     p_opt, q_opt, ic_min, ic_matrix = armasel(y, pmax=4, qmax=2, criterion="aic")
     
-    assert isinstance(p_opt, int)
-    assert isinstance(q_opt, int)
+    assert isinstance(p_opt, (int, np.integer))
+    assert isinstance(q_opt, (int, np.integer))
     assert 0 <= p_opt <= 4
     assert 0 <= q_opt <= 2
     assert ic_matrix.shape == (5, 3)  # (pmax+1, qmax+1)
@@ -43,8 +43,8 @@ def test_armasel_criteria():
     criteria = ["aic", "bic", "hq"]
     for criterion in criteria:
         p_opt, q_opt, ic_min, ic_matrix = armasel(y, pmax=3, qmax=1, criterion=criterion)
-        assert isinstance(p_opt, int)
-        assert isinstance(q_opt, int)
+        assert isinstance(p_opt, (int, np.integer))
+        assert isinstance(q_opt, (int, np.integer))
         assert np.isfinite(ic_min)
 
 

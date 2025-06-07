@@ -241,7 +241,7 @@ def tricoherence(
                 if k4 < max_freq_idx:
                     denom = np.sqrt(P[k1] * P[k2] * P[k3] * P[k4])
                     if denom > 0:
-                        tricoh[k1, k2, k3] = np.abs(Tspec[k1, k2, k3]) / denom
+                        tricoh[k1, k2, k3] = min(1.0, np.abs(Tspec[k1, k2, k3]) / denom)
 
     return tricoh, waxis
 

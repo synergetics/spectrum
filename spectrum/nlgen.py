@@ -225,13 +225,19 @@ def _generate_narma(
         if nonlinear_func == "tanh":
             nonlinear_part = c[0] * np.tanh(linear_sum) if len(c) > 0 else 0
         elif nonlinear_func == "sigmoid":
-            nonlinear_part = c[0] / (1 + np.exp(-linear_sum)) if len(c) > 0 else 0
+            nonlinear_part = c[0] / (1 + np.exp(-np.clip(linear_sum, -500, 500))) if len(c) > 0 else 0
         elif nonlinear_func == "cubic":
-            nonlinear_part = c[0] * linear_sum**3 if len(c) > 0 else 0
+            # Clip to prevent overflow
+            clipped_sum = np.clip(linear_sum, -10, 10)
+            nonlinear_part = c[0] * clipped_sum**3 if len(c) > 0 else 0
         else:
-            nonlinear_part = c[0] * linear_sum**2 if len(c) > 0 else 0
+            # Quadratic case
+            clipped_sum = np.clip(linear_sum, -100, 100)
+            nonlinear_part = c[0] * clipped_sum**2 if len(c) > 0 else 0
 
-        y[n] = linear_sum + nonlinear_part + e[n]
+        result = linear_sum + nonlinear_part + e[n]
+        # Clip final result to prevent divergence
+        y[n] = np.clip(result, -1e6, 1e6)
 
     return y
 
@@ -374,7 +380,7 @@ def _kurtosis(x: np.ndarray) -> float:
     return np.mean(x_centered**4) / (np.std(x) ** 4) - 3
 
 
-def _bds_test(x: np.ndarray, m: int = 2, eps: float = None) -> float:
+def _bds_test(x: np.ndarray, m: int = 2, eps: Optional[float] = None) -> float:
     """Simplified BDS test statistic."""
     if eps is None:
         eps = np.std(x) * 0.5
@@ -420,7 +426,7 @@ def _lyapunov_estimate(x: np.ndarray, tau: int = 1, m: int = 3) -> float:
                 nearest_idx += 1
 
             # Track divergence
-            for k in range(1, min(10, len(embedded) - max(i, nearest_idx))):
+            for k in range(1, min(10, len(embedded) - int(max(i, nearest_idx)))):
                 if i + k < len(embedded) and nearest_idx + k < len(embedded):
                     dist = np.linalg.norm(embedded[i + k] - embedded[nearest_idx + k])
                     if dist > 0:

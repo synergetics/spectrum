@@ -126,7 +126,7 @@ def armasel(
     q_opt = min_idx[1]
     ic_min = ic_matrix[p_opt, q_opt]
 
-    return p_opt, q_opt, ic_min, ic_matrix
+    return int(p_opt), int(q_opt), ic_min, ic_matrix
 
 
 def plot_ic_surface(

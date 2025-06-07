@@ -234,8 +234,8 @@ def plot_arma_poles_zeros(a: np.ndarray, b: np.ndarray, title: str = "ARMA Poles
         ax.grid(True, alpha=0.3)
         ax.legend()
         ax.axis("equal")
-        ax.set_xlim([-1.5, 1.5])
-        ax.set_ylim([-1.5, 1.5])
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
 
         plt.tight_layout()
         plt.show()
