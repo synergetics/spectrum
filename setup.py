@@ -10,7 +10,7 @@ with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="higher-spectrum",
-    version="0.2.0",
+    version="0.3.0",
     packages=find_packages(),
     install_requires=["numpy>=1.18.0", "scipy>=1.4.0", "matplotlib>=3.1.0"],
     include_package_data=True,
