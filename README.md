@@ -219,3 +219,24 @@ measures = nonlinear_measures(y_henon)
 
 This toolkit is based on the Higher Order Spectral Analysis toolkit for MATLAB.
 We've adapted and extended it for Python users.
+
+## Backends
+
+The estimators run on a native C extension when available and fall back to the
+pure-Python reference implementations otherwise.
+
+```python
+import os
+os.environ["SPECTRUM_BACKEND"] = "python"  # force the python reference
+```
+
+Build knobs: `SPECTRUM_NO_OPENMP=1` builds without OpenMP, `SPECTRUM_NATIVE=1`
+adds `-march=native` (not for distributed wheels). Benchmarks:
+`python tests/bench/bench_core.py` (bispectrumd 4.9x, bicoherence 3.4x, trispec
+5.4x on a 24-core machine).
+
+## Changelog
+
+See `CHANGELOG.md` for the full 0.4.0 changes: HOSA semantic fixes, the C core,
+and the new functions (`cumtrue`, `trispec`, `wig2`, `wig2c`, `wig4`, `wig4c`,
+`tfrwv`, `doa`, `armaqs`, `armarts`).
