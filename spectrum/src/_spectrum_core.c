@@ -18,6 +18,7 @@
 #include "fft/fft_iface.h"
 #include "estimators_cum.h"
 #include "estimators_bispec.h"
+#include "wigner.h"
 
 /* module-level one-time init flag for the fft engine (nothing needed yet) */
 
@@ -814,6 +815,120 @@ static PyObject *py_trispec(PyObject *self, PyObject *args) {
     return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
 }
 
+static PyObject *py_wig_generic(PyObject *self, PyObject *args, int which) {
+    /* which: 0 = wig2(real), 1 = wig2c, 2 = wig4(real), 3 = wig4c */
+    PyObject *xo;
+    long nfft_in, inc_in;
+    PyArrayObject *xa = NULL, *outa = NULL;
+    size_t N, n_time, nfft, inc;
+    sp_status st;
+    npy_intp dims[3];
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "Oll", &xo, &nfft_in, &inc_in)) return NULL;
+    xa = py_to_c128_f(xo);
+    if (!xa) return NULL;
+    N = (size_t)PyArray_SIZE(xa);
+    nfft = (size_t)(nfft_in > 0 ? nfft_in : 128);
+    inc = (size_t)(inc_in > 0 ? inc_in : 1);
+    n_time = (N + inc - 1) / inc;
+    if (n_time == 0) n_time = 1;
+
+    if (which <= 1) {
+        outa = py_new_c128(2, (npy_intp[]){(npy_intp)n_time, (npy_intp)nfft});
+    } else {
+        dims[0] = (npy_intp)n_time;
+        dims[1] = (npy_intp)nfft;
+        dims[2] = (npy_intp)nfft;
+        outa = py_new_c128(3, dims);
+    }
+    if (!outa) {
+        Py_DECREF(xa);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    if (which <= 1)
+        st = sp_wig2((const sp_c128 *)PyArray_DATA(xa), N, nfft, inc,
+                     which == 1, (sp_c128 *)PyArray_DATA(outa));
+    else
+        st = sp_wig4((const sp_c128 *)PyArray_DATA(xa), N, nfft, inc,
+                     which == 3, (sp_c128 *)PyArray_DATA(outa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(xa);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        return PyErr_Format(PyExc_ValueError, "wigner kernel error %d", (int)st);
+    }
+    /* the real-valued variants store real numbers in a complex container;
+     * the python wrapper takes the real part */
+    return (PyObject *)outa;
+}
+
+static PyObject *py_wig2(PyObject *self, PyObject *args) {
+    return py_wig_generic(self, args, 0);
+}
+static PyObject *py_wig2c(PyObject *self, PyObject *args) {
+    return py_wig_generic(self, args, 1);
+}
+static PyObject *py_wig4(PyObject *self, PyObject *args) {
+    return py_wig_generic(self, args, 2);
+}
+static PyObject *py_wig4c(PyObject *self, PyObject *args) {
+    return py_wig_generic(self, args, 3);
+}
+static PyObject *py_tfrwv(PyObject *self, PyObject *args) {
+    PyObject *yo;
+    long nfft_in, inc_in;
+    PyArrayObject *ya = NULL, *outa = NULL, *ta = NULL;
+    size_t N, n_time, nfft, inc;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "Oll", &yo, &nfft_in, &inc_in)) return NULL;
+    ya = py_to_c128_f(yo);
+    if (!ya) return NULL;
+    N = (size_t)PyArray_SIZE(ya);
+    nfft = (size_t)(nfft_in > 0 ? nfft_in : 128);
+    inc = (size_t)(inc_in > 0 ? inc_in : 1);
+    n_time = (N + inc - 1) / inc;
+    if (n_time == 0) n_time = 1;
+    outa = py_new_c128(2, (npy_intp[]){(npy_intp)n_time, (npy_intp)nfft});
+    ta = py_new_f64(1, (npy_intp[]){(npy_intp)n_time});
+    if (!outa || !ta) {
+        Py_XDECREF(outa);
+        Py_XDECREF(ta);
+        Py_DECREF(ya);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_wig2((const sp_c128 *)PyArray_DATA(ya), N, nfft, inc, 0,
+                 (sp_c128 *)PyArray_DATA(outa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(ya);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(ta);
+        return PyErr_Format(PyExc_ValueError, "tfrwv kernel error %d", (int)st);
+    }
+    for (size_t i = 0; i < n_time; i++)
+        ((double *)PyArray_DATA(ta))[i] = (double)(i * inc);
+    /* materialize the real part as float64 */
+    {
+        npy_intp rdims[2] = {(npy_intp)n_time, (npy_intp)nfft};
+        PyArrayObject *reala = py_new_f64(2, rdims);
+        if (!reala) {
+            Py_DECREF(outa);
+            Py_DECREF(ta);
+            return NULL;
+        }
+        const sp_c128 *src = (const sp_c128 *)PyArray_DATA(outa);
+        double *dst = (double *)PyArray_DATA(reala);
+        for (size_t i = 0; i < n_time * nfft; i++) dst[i] = creal(src[i]);
+        Py_DECREF(outa);
+        return Py_BuildValue("NN", (PyObject *)reala, (PyObject *)ta);
+    }
+}
+
 /* ---- selftest ------------------------------------------------------ */
 
 static PyObject *py_selftest(PyObject *self, PyObject *args) {    double complex buf[16];
@@ -848,6 +963,11 @@ static PyMethodDef module_methods[] = {
     {"tricoherence", py_tricoherence, METH_VARARGS, "tricoherence"},
     {"cumtrue", py_cumtrue, METH_VARARGS, "theoretical ARMA cumulants"},
     {"trispec", py_trispec, METH_VARARGS, "HOSA-style full trispectrum"},
+    {"wig2", py_wig2, METH_VARARGS, "Wigner spectrum (real)"},
+    {"wig2c", py_wig2c, METH_VARARGS, "Wigner spectrum (complex)"},
+    {"wig4", py_wig4, METH_VARARGS, "Wigner bispectrum (real)"},
+    {"wig4c", py_wig4c, METH_VARARGS, "Wigner bispectrum (complex)"},
+    {"tfrwv", py_tfrwv, METH_VARARGS, "pseudo Wigner-Ville time-freq map"},
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 

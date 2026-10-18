@@ -37,6 +37,7 @@ try:
                 "spectrum/src/estimators_cum.c",
                 "spectrum/src/estimators_bispec.c",
                 "spectrum/src/cumtrue.c",
+                "spectrum/src/wigner.c",
             ],
             include_dirs=["spectrum/src", numpy.get_include()],
             define_macros=[("kiss_fft_scalar", "double")],
