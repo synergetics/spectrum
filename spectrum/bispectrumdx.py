@@ -7,7 +7,7 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Union, Any
 
-from .tools.matlab import nextpow2, flat_eq
+from .tools.matlab import flat_eq, as_column
 
 log = logging.getLogger(__file__)
 
@@ -60,6 +60,9 @@ def bispectrumdx(
     about the interaction between different frequency components across multiple signals.
     """
 
+    x = as_column(x)
+    y = as_column(y)
+    z = as_column(z)
     (lx, lrecs) = x.shape
     (ly, nrecs) = y.shape
     (lz, krecs) = z.shape
@@ -79,7 +82,7 @@ def bispectrumdx(
     if nrecs == 1 and nsamp <= 0:
         nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
     if nfft < nsamp:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
@@ -106,9 +109,10 @@ def bispectrumdx(
         else:
             opwind = 1
     elif isinstance(wind, np.ndarray) and wind.ndim == 1:
+        window = np.concatenate((wind, np.zeros(len(wind) - 1)))
         windf = np.concatenate((wind[:0:-1], wind))
-        opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(wind), wind)
-        winsize = len(wind)
+        opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(window), window)
+        winsize = len(window)
     else:
         winsize = wind.shape[0]
         if wind.shape[0] != wind.shape[1]:
@@ -145,11 +149,9 @@ def bispectrumdx(
 
     Bspec = np.fft.fftshift(Bspec) / nrecs
 
-    # Frequency-domain smoothing
+    # Frequency-domain smoothing: mode='same' == MATLAB conv2 + center crop
     if winsize > 1:
-        lby2 = int((winsize - 1) / 2)
         Bspec = convolve2d(Bspec, opwind, mode="same")
-        Bspec = Bspec[lby2 : lby2 + nfft, lby2 : lby2 + nfft]
 
     if nfft % 2 == 0:
         waxis = np.transpose(np.arange(-nfft // 2, nfft // 2)) / nfft

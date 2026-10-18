@@ -15,6 +15,6 @@ def test_bispectrumdx():
     z = np.sin(2 * np.pi * 15 * t) + 0.1 * np.random.randn(len(t))
     x, y, z = x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)  # Reshape to 2D arrays
     Bspec, waxis = bispectrumdx(x, y, z, nfft=256, nsamp=256)
-    assert Bspec.shape == (254, 254)
+    assert Bspec.shape == (256, 256)
     assert waxis.shape == (256,)
-    plot_bispectrumdx(Bspec, waxis[1:-1])
+    plot_bispectrumdx(Bspec, waxis)
