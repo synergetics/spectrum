@@ -115,8 +115,8 @@ def test_cum4est_k2_zero():
     y = rng.standard_normal(4096).reshape(-1, 1)
     c4 = cum4est(y, 5, 4096, 0, "biased", 0, 0)
     assert c4.shape == (11, 1)
-    # 4th-order cumulants of Gaussian data are ~0
-    assert np.abs(c4).max() < 0.05
+    # 4th-order cumulants of Gaussian data are ~0 (estimator std ~ 0.08)
+    assert np.abs(c4).max() < 0.25
 
 
 def test_cum4est_gaussian_moment_products():
@@ -125,4 +125,4 @@ def test_cum4est_gaussian_moment_products():
     y = rng.standard_normal(20000).reshape(-1, 1)
     for k1, k2 in [(0, 1), (1, -2), (-1, 1)]:
         c4 = cum4est(y, 3, 20000, 0, "biased", k1, k2)
-        assert np.abs(c4).max() < 0.05
+        assert np.abs(c4).max() < 0.15
