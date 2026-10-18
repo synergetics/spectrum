@@ -51,7 +51,7 @@ except ImportError:  # numpy missing: pure-Python fallback package
 
 setup(
     name="higher-spectrum",
-    version="0.3.0",
+    version="0.4.0",
     packages=find_packages(),
     install_requires=["numpy>=1.18.0", "scipy>=1.4.0", "matplotlib>=3.1.0"],
     ext_modules=ext_modules,
