@@ -134,5 +134,6 @@ def test_cum2est_complex_convention():
     x = (rng.standard_normal(64) + 1j * rng.standard_normal(64)).reshape(-1, 1)
     c2 = cum2est(x, 3, 64, 0, "biased").ravel()
     xm = x.ravel() - x.ravel().mean()
-    expect = [np.mean(np.conj(xm[: 64 - m]) * xm[m:]) for m in (3, 2, 1, 0)]
+    # biased estimate: divide by nsamp (not the shrinking window length)
+    expect = [np.dot(np.conj(xm[: 64 - m]), xm[m:]) / 64 for m in (3, 2, 1, 0)]
     assert np.allclose(c2, [np.conj(expect[0]), np.conj(expect[1]), np.conj(expect[2]), expect[3], expect[2], expect[1], expect[0]])

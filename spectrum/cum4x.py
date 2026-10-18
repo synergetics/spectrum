@@ -105,7 +105,12 @@ def cum4x(
         scale = scale.reshape(-1, 1)
 
     # estimate second- and fourth-order moments combine
-    y_cum = np.zeros([2 * maxlag + 1, 1])
+    y_cum = np.zeros(
+        [2 * maxlag + 1, 1],
+        dtype=(
+            complex if (np.iscomplexobj(w) or np.iscomplexobj(x) or np.iscomplexobj(y) or np.iscomplexobj(z)) else float
+        ),
+    )
     rind = np.arange(-maxlag, maxlag + 1)
     ind = np.arange(nsamp)
 

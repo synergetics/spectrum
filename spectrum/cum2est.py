@@ -54,7 +54,7 @@ def cum2est(
     nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 
-    y_cum = np.zeros([maxlag + 1, 1])
+    y_cum = np.zeros([maxlag + 1, 1], dtype=complex if np.iscomplexobj(y) else float)
     ind = np.arange(nsamp)
     y = y.ravel(order="F")
 

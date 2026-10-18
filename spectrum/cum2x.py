@@ -79,7 +79,7 @@ def cum2x(
 
     nlags = 2 * maxlag + 1
     zlag = maxlag
-    y_cum = np.zeros([nlags, 1])
+    y_cum = np.zeros([nlags, 1], dtype=complex if (np.iscomplexobj(x) or np.iscomplexobj(y)) else float)
 
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp

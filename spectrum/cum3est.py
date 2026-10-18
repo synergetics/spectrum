@@ -59,7 +59,7 @@ def cum3est(
     nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 
-    y_cum = np.zeros([maxlag - minlag + 1, 1])
+    y_cum = np.zeros([maxlag - minlag + 1, 1], dtype=complex if np.iscomplexobj(y) else float)
 
     ind = np.arange(nsamp).T
     nlags = 2 * maxlag + 1

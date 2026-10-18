@@ -89,7 +89,7 @@ def cum4est(
         complex_flag = 0
 
     # estimate second- and fourth-order moments combine
-    y_cum = np.zeros([2 * maxlag + 1, 1])
+    y_cum = np.zeros([2 * maxlag + 1, 1], dtype=complex if np.iscomplexobj(y) else float)
     R_yy = np.zeros([2 * mlag + 1, 1])
 
     ind = np.arange(nsamp)
