@@ -77,3 +77,31 @@ if __name__ == "__main__":
     test_plot_ic_surface()
     test_plot_ic_comparison()
     print("All armasel tests passed!")
+
+def test_armasel_recovers_order():
+    rng = np.random.default_rng(12)
+    n = 20000
+    e = rng.standard_normal(n)
+    y = np.zeros(n)
+    for i in range(2, n):
+        y[i] = 0.5 * y[i - 1] - 0.2 * y[i - 2] + e[i]
+    p_opt, q_opt, ic_min, ic_matrix = armasel(y.reshape(-1, 1), pmax=3, qmax=2, criterion="bic")
+    assert p_opt == 2
+    assert q_opt == 0
+
+
+def test_armasel_raises_when_all_fits_fail(monkeypatch):
+    import pytest
+
+    # simulate every candidate fit failing
+    import importlib
+
+    mod = importlib.import_module("spectrum.armasel")
+
+    def boom(*args, **kwargs):
+        raise ValueError("fit failed")
+
+    monkeypatch.setattr(mod, "armafit", boom)
+    y = np.random.default_rng(0).standard_normal(256).reshape(-1, 1)
+    with pytest.raises(RuntimeError):
+        armasel(y, pmax=2, qmax=1)

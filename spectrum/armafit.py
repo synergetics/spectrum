@@ -55,9 +55,10 @@ def armafit(
 
     Notes:
     ------
-    This function uses the C2E (cumulant to equation) method which exploits
-    the relationship between ARMA parameters and cumulants. The estimates
-    are consistent in colored Gaussian noise environments.
+    This function uses 2nd-order statistics (modified Yule-Walker equations on
+    the estimated autocorrelation); it is an extension, not part of the HOSA
+    toolbox. For cumulant-based ARMA estimation (robust to colored Gaussian
+    noise), see ``armaqs`` (q-slice) and ``armarts`` (residual time-series).
 
     The ARMA model is: A(z) * y(n) = B(z) * e(n)
     where A(z) = 1 + a(1)*z^(-1) + ... + a(p)*z^(-p)
@@ -81,7 +82,7 @@ def armafit(
         raise ValueError("Insufficient cumulant lags for ARMA estimation")
 
     # Extract positive lag cumulants (c2 is symmetric, so we take the positive part)
-    c2_pos = c2[maxlag:]  # lags 0, 1, 2, ..., maxlag
+    c2_pos = np.asarray(c2[maxlag:]).ravel()  # lags 0, 1, 2, ..., maxlag
 
     # Set up the linear system for ARMA parameter estimation
     # Using the modified Yule-Walker equations for ARMA models
@@ -105,11 +106,12 @@ def armafit(
             if i + 1 < len(c2_pos):
                 r[i] = c2_pos[i + 1]
 
-        # Solve for preliminary AR parameters
+        # Solve for preliminary AR parameters; Yule-Walker gives
+        # sum_i a_i R(m-i) = -R(m), hence the negation.
         try:
-            alpha = solve(R, r)
+            alpha = -solve(R, r)
         except np.linalg.LinAlgError:
-            alpha = lstsq(R, r)[0]
+            alpha = -lstsq(R, r)[0]
 
         # Extend to full length
         a = np.zeros(p + 1)
@@ -122,7 +124,7 @@ def armafit(
         b[0] = 1.0
 
         # Calculate residual variance
-        rho = c2_pos[0] - np.dot(
+        rho = c2_pos[0] + np.dot(
             alpha[: min(len(alpha), len(c2_pos) - 1)], c2_pos[1 : min(len(alpha) + 1, len(c2_pos))]
         )
 
@@ -148,16 +150,16 @@ def armafit(
                 r[i] = c2_pos[i + 1]
 
         try:
-            alpha = solve(R, r)
+            alpha = -solve(R, r)
         except np.linalg.LinAlgError:
-            alpha = lstsq(R, r)[0]
+            alpha = -lstsq(R, r)[0]
 
         a = np.zeros(p + 1)
         a[0] = 1.0
         a[1:] = alpha
 
         b = np.array([1.0])
-        rho = c2_pos[0] - np.dot(alpha, c2_pos[1 : p + 1])
+        rho = c2_pos[0] + np.dot(alpha, c2_pos[1 : p + 1])
 
     elif q > 0:
         # Pure MA case - more complex, use iterative method
