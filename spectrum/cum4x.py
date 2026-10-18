@@ -87,7 +87,12 @@ def cum4x(
     nlags = 2 * maxlag + 1
     zlag = maxlag
 
-    tmp = np.zeros([nlags, 1])
+    tmp = np.zeros(
+        [nlags, 1],
+        dtype=(
+            complex if (np.iscomplexobj(w) or np.iscomplexobj(x) or np.iscomplexobj(y) or np.iscomplexobj(z)) else float
+        ),
+    )
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
         sc1 = 1 / nsamp

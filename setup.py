@@ -31,6 +31,7 @@ try:
                 "spectrum/src/_spectrum_core.c",
                 "spectrum/src/fft/fft_iface.c",
                 "spectrum/src/fft/kissfft/kiss_fft.c",
+                "spectrum/src/estimators_cum.c",
             ],
             include_dirs=["spectrum/src", numpy.get_include()],
             define_macros=[("kiss_fft_scalar", "double")],

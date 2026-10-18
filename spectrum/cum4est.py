@@ -66,7 +66,7 @@ def cum4est(
     # scale factors for unbiased estimates
     nlags = 2 * maxlag + 1
     zlag = maxlag
-    tmp = np.zeros([nlags, 1])
+    tmp = np.zeros([nlags, 1], dtype=complex if np.iscomplexobj(y) else float)
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
     else:
@@ -127,7 +127,8 @@ def cum4est(
         R_yy = cum2est(x, mlag, nsamp, overlap0, flag)
         #  We need E x(t)x(t+tau) stuff also:
         if complex_flag:
-            M_yy = cum2x(np.conj(x), x, mlag, nsamp, overlap0, flag)
+            xc = np.conj(x).reshape(-1, 1)
+            M_yy = cum2x(xc, x.reshape(-1, 1), mlag, nsamp, overlap0, flag)
         else:
             M_yy = R_yy
 
