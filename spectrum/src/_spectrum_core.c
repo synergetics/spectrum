@@ -708,6 +708,61 @@ static PyObject *py_tricoherence(PyObject *self, PyObject *args) {
     return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
 }
 
+static PyObject *py_cumtrue(PyObject *self, PyObject *args) {
+    PyObject *mao, *aro;
+    int norder, k;
+    long nlags_in;
+    PyArrayObject *maa = NULL, *ara = NULL, *outa = NULL;
+    long q1, p1, nlags;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "OOili", &mao, &aro, &norder, &nlags_in, &k))
+        return NULL;
+    if (norder < 2 || norder > 4) {
+        PyErr_SetString(PyExc_ValueError, "norder should be 2, 3 or 4");
+        return NULL;
+    }
+    maa = py_wind_to_f64(mao); /* reuse: contiguous float64 coercion */
+    ara = py_wind_to_f64(aro);
+    if (!maa || !ara) {
+        Py_XDECREF(maa);
+        Py_XDECREF(ara);
+        return NULL;
+    }
+    q1 = (long)PyArray_SIZE(maa);
+    p1 = (long)PyArray_SIZE(ara);
+    nlags = (nlags_in < 0) ? (p1 - 1 + q1 - 1) : nlags_in;
+    if (nlags < 0) nlags = 0;
+    if (norder == 2) {
+        outa = py_new_f64(2, (npy_intp[]){(npy_intp)(2 * nlags + 1), 1});
+    } else {
+        outa = py_new_f64(2, (npy_intp[]){(npy_intp)(2 * nlags + 1),
+                                          (npy_intp)(2 * nlags + 1)});
+    }
+    if (!outa) {
+        Py_DECREF(maa);
+        Py_DECREF(ara);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_cumtrue((const double *)PyArray_DATA(maa), q1,
+                    (const double *)PyArray_DATA(ara), p1, norder, nlags, k,
+                    (double *)PyArray_DATA(outa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(maa);
+    Py_DECREF(ara);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        if (st == SP_ERR_ARG)
+            PyErr_SetString(PyExc_ValueError, "unstable AR polynomial passed");
+        else
+            PyErr_Format(PyExc_RuntimeError, "cumtrue kernel error %d", (int)st);
+        return NULL;
+    }
+    return (PyObject *)outa;
+}
+
 /* ---- selftest ------------------------------------------------------ */
 
 static PyObject *py_selftest(PyObject *self, PyObject *args) {    double complex buf[16];
@@ -740,6 +795,7 @@ static PyMethodDef module_methods[] = {
     {"bispectrumi", py_bispectrumi, METH_VARARGS, "bispectrum (indirect)"},
     {"trispectrum", py_trispectrum, METH_VARARGS, "trispectrum (reduced grid)"},
     {"tricoherence", py_tricoherence, METH_VARARGS, "tricoherence"},
+    {"cumtrue", py_cumtrue, METH_VARARGS, "theoretical ARMA cumulants"},
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 

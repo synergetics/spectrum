@@ -10,6 +10,13 @@
 extern "C" {
 #endif
 
+/* Theoretical cumulants of an ARMA model (HOSA CUMTRUE.M). ma/ar are
+ * real coefficient vectors INCLUDING the leading 1 (q1/p1 = lengths).
+ * nlags must already be resolved (>= 0). out: norder==2 -> (2*nlags+1)
+ * doubles; else (2*nlags+1)^2 doubles, origin at the center. */
+sp_status sp_cumtrue(const double *ma, long q1, const double *ar, long p1,
+                     int norder, long nlags, int k, double *out);
+
 typedef double complex sp_c128;
 
 /* All inputs are flat, Fortran-order (column-major) complex128 buffers as
