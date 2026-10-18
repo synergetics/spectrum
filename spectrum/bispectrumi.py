@@ -5,7 +5,7 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Union, Any
 
-from .tools.matlab import nextpow2, make_arr
+from .tools.matlab import make_arr, as_column
 
 np.set_printoptions(linewidth=120)
 
@@ -58,6 +58,7 @@ def bispectrumi(
     and then applying a 2D Fourier transform.
     """
 
+    y = as_column(y)
     (ly, nrecs) = y.shape
     if ly == 1:
         y = y.reshape(1, -1)
@@ -75,10 +76,11 @@ def bispectrumi(
     if wind is None:
         wind = 0
 
-    if nlag == 0:
-        nlag = min(nlag, nsamp - 1)
+    nlag = min(nlag, nsamp - 1)
+    if nlag < 1:
+        raise ValueError('"nlag" must be a positive integer (see MATLAB BISPECI: nlag must be specified)')
     if nfft < 2 * nlag + 1:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     # Create the lag window
     Bspec = np.zeros((nfft, nfft))

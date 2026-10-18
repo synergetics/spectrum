@@ -18,3 +18,15 @@ def test_bicoherencex():
     assert bic.shape == (256, 256)
     assert waxis.shape == (256,)
     plot_bicoherencex(bic, waxis)
+
+
+def test_bicoherencex_1d_inputs():
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    n = 4096
+    w = rng.standard_normal(n)
+    x = rng.standard_normal(n)
+    y = rng.standard_normal(n)
+    bic, waxis = bicoherencex(w, x, y, nfft=128, nsamp=256)
+    assert bic.shape == (256, 256)  # nfft bumped to >= nsamp

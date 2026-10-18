@@ -18,3 +18,19 @@ def test_bispectrumi():
     assert Bspec.shape == (128, 128)
     assert waxis.shape == (128,)
     plot_bispectrumi(Bspec, waxis)
+
+
+def test_bispectrumi_1d_input_and_nlag_validation():
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    y = rng.standard_normal(2048)
+    Bspec, waxis = bispectrumi(y, nlag=16, nsamp=512, overlap=50, nfft=128)
+    assert Bspec.shape == (128, 128)
+    # nlag must be positive
+    try:
+        bispectrumi(y.reshape(-1, 1), nlag=0, nsamp=512)
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised

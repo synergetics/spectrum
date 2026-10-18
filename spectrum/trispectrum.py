@@ -4,7 +4,7 @@ import numpy as np
 import logging
 from typing import Any, Optional, Tuple
 
-from .tools.matlab import shape, nextpow2
+from .tools.matlab import shape
 
 log = logging.getLogger(__file__)
 
@@ -76,7 +76,7 @@ def trispectrum(
     if overlap is None:
         overlap = 0
     if nfft is None:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     # Convert overlap percentage to samples
     overlap = int(np.fix(overlap / 100 * nsamp))
@@ -115,8 +115,8 @@ def trispectrum(
 
     for i in range(nrecord):
         # Extract and window the segment
-        x = y[ind] * wind
-        x = x - np.mean(x)  # Remove DC
+        seg = y[ind] - np.mean(y[ind])  # remove DC before windowing
+        x = seg * wind
 
         # Compute FFT
         X = np.fft.fft(x, nfft)
@@ -196,7 +196,7 @@ def tricoherence(
     if overlap is None:
         overlap = 0
     if nfft is None:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
@@ -212,7 +212,7 @@ def tricoherence(
     elif window == "blackman":
         wind = np.blackman(nsamp)
     else:
-        wind = np.ones(nsamp)
+        raise ValueError(f"Unknown window type: {window}")
 
     wind = wind / np.linalg.norm(wind) * np.sqrt(nsamp)
 
@@ -222,8 +222,8 @@ def tricoherence(
 
     ind = np.arange(nsamp)
     for i in range(nrecord):
-        x = y[ind] * wind
-        x = x - np.mean(x)
+        seg = y[ind] - np.mean(y[ind])  # remove DC before windowing
+        x = seg * wind
         X = np.fft.fft(x, nfft)
         X = X[:max_freq_idx]
         P += np.abs(X) ** 2

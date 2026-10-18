@@ -6,7 +6,7 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from .tools.matlab import nextpow2, flat_eq
+from .tools.matlab import flat_eq, as_column
 
 log = logging.getLogger(__file__)
 
@@ -56,6 +56,9 @@ def bicoherencex(
     between triple combinations of frequency components from three different signals.
     """
 
+    w = as_column(w)
+    x = as_column(x)
+    y = as_column(y)
     if w.shape != x.shape or x.shape != y.shape:
         raise ValueError("w, x and y should have identical dimensions")
 
@@ -67,7 +70,7 @@ def bicoherencex(
         y = y.reshape(1, -1)
 
     if nfft < nsamp:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     overlap = max(0, min(overlap, 99))
     if nrecs > 1:

@@ -58,7 +58,7 @@ def shape(o: np.ndarray[Any, np.dtype[Any]], n: int):
     """
     s = o.shape
     if len(s) < n:
-        x = tuple(np.ones(n - len(s)))
+        x = tuple([1] * (n - len(s)))
         return s + x
     else:
         return s
