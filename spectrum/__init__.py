@@ -56,6 +56,7 @@ from .armasel import armasel, plot_ic_surface, plot_ic_comparison
 from .harmgen import harmgen, harmgen_complex, plot_harmonic_signal, harmonic_snr
 from .nlgen import nlgen, plot_nonlinear_series, nonlinear_measures
 from .trispec import trispec
+from .doa import doa
 from .wig import tfrwv, wig2, wig2c, wig4, wig4c
 from .trispectrum import (
     trispectrum,
@@ -94,6 +95,7 @@ __all__ = [
     "plot_harmonic_signal",
     "harmonic_snr",
     "cumtrue",
+    "doa",
     "nlgen",
     "plot_nonlinear_series",
     "nonlinear_measures",

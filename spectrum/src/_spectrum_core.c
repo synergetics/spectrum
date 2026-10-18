@@ -19,6 +19,7 @@
 #include "estimators_cum.h"
 #include "estimators_bispec.h"
 #include "wigner.h"
+#include "estimators_ext.h"
 
 /* module-level one-time init flag for the fft engine (nothing needed yet) */
 
@@ -929,6 +930,40 @@ static PyObject *py_tfrwv(PyObject *self, PyObject *args) {
     }
 }
 
+static PyObject *py_doa_cum(PyObject *self, PyObject *args) {
+    PyObject *xo;
+    PyArrayObject *xa = NULL, *outa = NULL;
+    size_t N, M;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "O", &xo)) return NULL;
+    xa = (PyArrayObject *)PyArray_FROM_OTF(xo, NPY_CDOUBLE, NPY_ARRAY_IN_ARRAY);
+    if (!xa) return NULL;
+    if (PyArray_NDIM(xa) != 2) {
+        Py_DECREF(xa);
+        PyErr_SetString(PyExc_ValueError, "y must be 2-D with shape (snapshots, sensors)");
+        return NULL;
+    }
+    N = (size_t)PyArray_DIM(xa, 0);
+    M = (size_t)PyArray_DIM(xa, 1);
+    outa = py_new_c128(2, (npy_intp[]){(npy_intp)M, (npy_intp)M});
+    if (!outa) {
+        Py_DECREF(xa);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_doa_cum((const sp_c128 *)PyArray_DATA(xa), N, M,
+                    (sp_c128 *)PyArray_DATA(outa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(xa);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        return PyErr_Format(PyExc_ValueError, "doa kernel error %d", (int)st);
+    }
+    return (PyObject *)outa;
+}
+
 /* ---- selftest ------------------------------------------------------ */
 
 static PyObject *py_selftest(PyObject *self, PyObject *args) {    double complex buf[16];
@@ -968,6 +1003,7 @@ static PyMethodDef module_methods[] = {
     {"wig4", py_wig4, METH_VARARGS, "Wigner bispectrum (real)"},
     {"wig4c", py_wig4c, METH_VARARGS, "Wigner bispectrum (complex)"},
     {"tfrwv", py_tfrwv, METH_VARARGS, "pseudo Wigner-Ville time-freq map"},
+    {"doa_cum", py_doa_cum, METH_VARARGS, "doa 4th-order cumulant matrix"},
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 
