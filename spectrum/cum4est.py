@@ -116,11 +116,11 @@ def cum4est(
             if k2 < 0:
                 z[0:-k2] = 0.0
 
-        tmp[zlag] = tmp[zlag] + np.dot(z.T, x)
+        tmp[zlag] = tmp[zlag] + np.dot(np.conj(z), x)
 
         for k in range(1, maxlag + 1):
-            tmp[zlag - k] = tmp[zlag - k] + np.dot(z[k:nsamp].T, x[0 : nsamp - k])
-            tmp[zlag + k] = tmp[zlag + k] + np.dot(z[0 : nsamp - k].T, x[k:nsamp])
+            tmp[zlag - k] = tmp[zlag - k] + np.dot(np.conj(z[k:nsamp]), x[0 : nsamp - k])
+            tmp[zlag + k] = tmp[zlag + k] + np.dot(np.conj(z[0 : nsamp - k]), x[k:nsamp])
 
         y_cum = y_cum + tmp * scale
 

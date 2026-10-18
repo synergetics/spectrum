@@ -126,3 +126,13 @@ def test_cum4est_gaussian_moment_products():
     for k1, k2 in [(0, 1), (1, -2), (-1, 1)]:
         c4 = cum4est(y, 3, 20000, 0, "biased", k1, k2)
         assert np.abs(c4).max() < 0.15
+
+
+def test_cum2est_complex_convention():
+    # MATLAB CUM2EST computes C2(m) = E[x*(n) x(n+m)] (the ' operator conjugates)
+    rng = np.random.default_rng(20)
+    x = (rng.standard_normal(64) + 1j * rng.standard_normal(64)).reshape(-1, 1)
+    c2 = cum2est(x, 3, 64, 0, "biased").ravel()
+    xm = x.ravel() - x.ravel().mean()
+    expect = [np.mean(np.conj(xm[: 64 - m]) * xm[m:]) for m in (3, 2, 1, 0)]
+    assert np.allclose(c2, [np.conj(expect[0]), np.conj(expect[1]), np.conj(expect[2]), expect[3], expect[2], expect[1], expect[0]])

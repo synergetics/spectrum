@@ -86,11 +86,11 @@ def cum3est(
             z[-k1:nsamp] = x[-k1:nsamp] * cx[0 : nsamp + k1]
 
         # compute third-order cumulants
-        y_cum[zlag] = y_cum[zlag] + np.dot(z.T, x)
+        y_cum[zlag] = y_cum[zlag] + np.dot(np.conj(z), x)
 
         for k in range(1, maxlag + 1):
-            y_cum[zlag - k] = y_cum[zlag - k] + np.dot(z[k:nsamp].T, x[0 : nsamp - k])
-            y_cum[zlag + k] = y_cum[zlag + k] + np.dot(z[0 : nsamp - k].T, x[k:nsamp])
+            y_cum[zlag - k] = y_cum[zlag - k] + np.dot(np.conj(z[k:nsamp]), x[0 : nsamp - k])
+            y_cum[zlag + k] = y_cum[zlag + k] + np.dot(np.conj(z[0 : nsamp - k]), x[k:nsamp])
 
         ind = ind + int(nadvance)
 
