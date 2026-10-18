@@ -52,6 +52,8 @@ from .cum4x import cum4x
 from .cumest import cumest
 from .cumtrue import cumtrue  # noqa: E402
 from .armafit import armafit, plot_arma_poles_zeros
+from .armaqs import armaqs
+from .armarts import armarts
 from .armasel import armasel, plot_ic_surface, plot_ic_comparison
 from .harmgen import harmgen, harmgen_complex, plot_harmonic_signal, harmonic_snr
 from .nlgen import nlgen, plot_nonlinear_series, nonlinear_measures
@@ -86,6 +88,8 @@ __all__ = [
     "cum4x",
     "cumest",
     "armafit",
+    "armaqs",
+    "armarts",
     "armasel",
     "plot_arma_poles_zeros",
     "plot_ic_surface",
