@@ -137,7 +137,9 @@ static int conv2d_same(sp_c128 *out, const sp_c128 *A, const double *K,
     size_t half = w / 2;
     /* scipy.signal.convolve2d(mode='same'): out[i,j] =
      * sum_{s,t} A[i+half-s, j+half-t] * K[s,t] (convolution flips K) */
-    for (size_t i = 0; i < n; i++) {
+    SP_OMP_PARALLEL_FOR
+    for (long long ii = 0; ii < (long long)n; ii++) {
+        size_t i = (size_t)ii;
         for (size_t j = 0; j < n; j++) {
             sp_c128 acc = 0.0;
             for (size_t s = 0; s < w; s++) {
@@ -233,23 +235,42 @@ sp_status sp_bicoherx(const sp_c128 *w, const sp_c128 *x, const sp_c128 *y,
         /* bic(i,j) += Wf(i) Xf(j) conj(Yf((i+j) mod nfft)); exact (i,j)
          * symmetry only in the auto case -> lower triangle + mirror */
         if (symmetric) {
-            for (size_t i = 0; i < nfft; i++) {
+            SP_OMP_PARALLEL_FOR
+            for (long long ii = 0; ii < (long long)nfft; ii++) {
+                size_t i = (size_t)ii;
                 sp_c128 wi = Wf[i];
-                for (size_t j = 0; j <= i; j++) {
-                    size_t ij = (i + j) % nfft;
+                size_t split = i < nfft - i ? i : nfft - i;
+                for (size_t j = 0; j < split; j++) {
+                    size_t ij = i + j;
                     sp_c128 v = wi * Xf[j] * conj(Yf[ij]);
                     bic_out[i * nfft + j] += v;
-                    if (j != i) bic_out[j * nfft + i] += v;
+                    bic_out[j * nfft + i] += v;
+                }
+                if (split == i) { /* j == i boundary, no wrap */
+                    sp_c128 v = wi * Xf[i] * conj(Yf[2 * i % nfft]);
+                    bic_out[i * nfft + i] += v;
+                } else {
+                    for (size_t j = split; j <= i; j++) {
+                        size_t ij = i + j - nfft;
+                        sp_c128 v = wi * Xf[j] * conj(Yf[ij]);
+                        bic_out[i * nfft + j] += v;
+                        if (j != i) bic_out[j * nfft + i] += v;
+                    }
                 }
             }
         } else {
-            /* MATLAB BICOHERX: (i,j) = Wf[i] * Xf[j] * conj(Yf[ij]) */
-            for (size_t i = 0; i < nfft; i++) {
+            /* MATLAB BICOHERX: (i,j) = Wf[i] * Xf[j] * conj(Yf[ij]);
+             * the wrapped index (i+j) mod nfft wraps once per row */
+            SP_OMP_PARALLEL_FOR
+            for (long long ii = 0; ii < (long long)nfft; ii++) {
+                size_t i = (size_t)ii;
                 sp_c128 wi = Wf[i];
-                for (size_t j = 0; j < nfft; j++) {
-                    size_t ij = (i + j) % nfft;
-                    bic_out[i * nfft + j] += wi * Xf[j] * conj(Yf[ij]);
-                }
+                sp_c128 *rowp = bic_out + i * nfft;
+                size_t split = nfft - i;
+                for (size_t j = 0; j < split; j++)
+                    rowp[j] += wi * Xf[j] * conj(Yf[i + j]);
+                for (size_t j = split; j < nfft; j++)
+                    rowp[j] += wi * Xf[j] * conj(Yf[i + j - nfft]);
             }
         }
     }
@@ -419,23 +440,41 @@ sp_status sp_bispecdx(const sp_c128 *x, const sp_c128 *y, const sp_c128 *z,
         }
         /* Bspec(i,j) += Xf(i) Yf(j) conj(Zf((i+j) mod nfft)) */
         if (symmetric) {
-            for (size_t i = 0; i < nfft; i++) {
+            SP_OMP_PARALLEL_FOR
+            for (long long ii = 0; ii < (long long)nfft; ii++) {
+                size_t i = (size_t)ii;
                 sp_c128 xi = Xf[i];
-                for (size_t j = 0; j <= i; j++) {
-                    size_t ij = (i + j) % nfft;
+                size_t split = i < nfft - i ? i : nfft - i;
+                for (size_t j = 0; j < split; j++) {
+                    size_t ij = i + j;
                     sp_c128 v = xi * Yf[j] * conj(Zf[ij]);
                     bspec_out[i * nfft + j] += v;
-                    if (j != i) bspec_out[j * nfft + i] += v;
+                    bspec_out[j * nfft + i] += v;
+                }
+                if (split == i) {
+                    sp_c128 v = xi * Yf[i] * conj(Zf[2 * i % nfft]);
+                    bspec_out[i * nfft + i] += v;
+                } else {
+                    for (size_t j = split; j <= i; j++) {
+                        size_t ij = i + j - nfft;
+                        sp_c128 v = xi * Yf[j] * conj(Zf[ij]);
+                        bspec_out[i * nfft + j] += v;
+                        if (j != i) bspec_out[j * nfft + i] += v;
+                    }
                 }
             }
         } else {
             /* MATLAB BISPECDx: (i,j) = Xf[i] * Yf[j] * conj(Zf[ij]) */
-            for (size_t i = 0; i < nfft; i++) {
+            SP_OMP_PARALLEL_FOR
+            for (long long ii = 0; ii < (long long)nfft; ii++) {
+                size_t i = (size_t)ii;
                 sp_c128 xi = Xf[i];
-                for (size_t j = 0; j < nfft; j++) {
-                    size_t ij = (i + j) % nfft;
-                    bspec_out[i * nfft + j] += xi * Yf[j] * conj(Zf[ij]);
-                }
+                sp_c128 *rowp = bspec_out + i * nfft;
+                size_t split = nfft - i;
+                for (size_t j = 0; j < split; j++)
+                    rowp[j] += xi * Yf[j] * conj(Zf[i + j]);
+                for (size_t j = split; j < nfft; j++)
+                    rowp[j] += xi * Yf[j] * conj(Zf[i + j - nfft]);
             }
         }
     }
@@ -925,16 +964,19 @@ sp_status sp_trispec(const sp_c128 *y, size_t N, size_t cols, size_t nsamp,
         }
         for (size_t n = 0; n < nfft; n++) X[n] /= (double)nsamp;
 
-        for (size_t k1 = 0; k1 < nfft; k1++) {
+        SP_OMP_PARALLEL_FOR
+        for (long long kk1 = 0; kk1 < (long long)nfft; kk1++) {
+            size_t k1 = (size_t)kk1;
             sp_c128 a = X[k1];
             for (size_t k2 = 0; k2 < nfft; k2++) {
                 sp_c128 ab = a * X[k2];
                 size_t base_ij = (k1 * nfft + k2) * nfft;
                 size_t k12 = (k1 + k2) % nfft;
-                for (size_t k3 = 0; k3 < nfft; k3++) {
-                    size_t k4 = (k12 + k3) % nfft;
-                    t_out[base_ij + k3] += ab * X[k3] * conj(X[k4]);
-                }
+                size_t split = nfft - k12;
+                for (size_t k3 = 0; k3 < split; k3++)
+                    t_out[base_ij + k3] += ab * X[k3] * conj(X[k12 + k3]);
+                for (size_t k3 = split; k3 < nfft; k3++)
+                    t_out[base_ij + k3] += ab * X[k3] * conj(X[k12 + k3 - nfft]);
             }
         }
     }
