@@ -1,6 +1,7 @@
 import scipy.io as sio
 import numpy as np
 from spectrum import cum2est, cum3est, cum4est
+from spectrum import cumest
 
 
 def test_specific_2est():
@@ -74,3 +75,35 @@ def test_specific_4est():
         0.4230397918730159,
         -0.997249679819298,
     ]
+
+
+def test_cumest_default_nsamp():
+    # nsamp=None (default) falls back to data length instead of crashing
+    rng = np.random.default_rng(0)
+    y = rng.standard_normal(256).reshape(-1, 1)
+    c = cumest(y, 2, 5)
+    assert c.shape == (11, 1)
+
+
+def test_cumest_order4_dispatch():
+    # norder=4 must reach cum4est, not cum3est
+    rng = np.random.default_rng(1)
+    y = rng.standard_normal(512).reshape(-1, 1)
+    via_cumest = cumest(y, 4, 3, nsamp=512, k1=1, k2=1)
+    direct = cum4est(y, 3, 512, 0, "biased", 1, 1)
+    assert np.allclose(via_cumest, direct)
+
+
+def test_cumest_flag_normalization():
+    # MATLAB: any flag not starting with b/B means unbiased
+    rng = np.random.default_rng(2)
+    y = rng.standard_normal(256).reshape(-1, 1)
+    assert np.allclose(cumest(y, 2, 3, nsamp=256, flag="Unbiased"), cumest(y, 2, 3, nsamp=256, flag="unbiased"))
+    assert np.allclose(cumest(y, 2, 3, nsamp=256, flag="b"), cumest(y, 2, 3, nsamp=256, flag="biased"))
+
+
+def test_cumest_1d_input():
+    rng = np.random.default_rng(3)
+    y = rng.standard_normal(256)
+    c = cumest(y, 3, 4, nsamp=256)
+    assert c.shape == (9, 1)
