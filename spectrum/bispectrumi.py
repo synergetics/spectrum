@@ -108,7 +108,7 @@ def bispectrumi(
         for j in range(nlag + 1):
             z = x[: nsamp - j] * x[j:nsamp]
             for i in range(j, nlag + 1):
-                Sum = np.dot(z[: nsamp - i].T, x[i:nsamp])
+                Sum = np.dot(np.conj(z[: nsamp - i]), x[i:nsamp])
                 if flag == "biased":
                     Sum = Sum / nsamp
                 else:
