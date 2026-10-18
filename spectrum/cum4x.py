@@ -109,7 +109,6 @@ def cum4x(
     rind = np.arange(-maxlag, maxlag + 1)
     ind = np.arange(nsamp)
 
-    log.info(nrecs)
     for i in range(nrecs):
         tmp = y_cum * 0
         R_zy = 0
@@ -136,14 +135,17 @@ def cum4x(
             R_wy = R_wy + np.dot(ws[-k1:nsamp].T, ys[0 : nsamp + k1])
 
         # create the "IV" matrix: offset for third lag
-        if k2 > 2:
+        if k2 >= 0:
             ziv[0 : nsamp - k2] = ziv[0 : nsamp - k2] * zs[k2:nsamp]
-            ziv[nsamp - k2 : nsamp] = np.zeros([k2, 1])
+            if k2 > 0:
+                ziv[nsamp - k2 : nsamp] = 0.0
             M_wz = M_wz + np.dot(ws[0 : nsamp - k2].T, zs[k2:nsamp])
         else:
             ziv[-k2:nsamp] = ziv[-k2:nsamp] * zs[0 : nsamp + k2]
-            ziv[0:-k2] = np.zeros([-k2, 1])
-            M_wz = M_wz + np.dot(ws[-k2:nsamp].T, zs[0 : nsamp - k2])
+            ziv[0:-k2] = 0.0
+            # HOSA's own CUM4X.M has a typo here (nsamp-k2); the ziv product
+            # two lines above uses nsamp+k2 and that is the intended pairing
+            M_wz = M_wz + np.dot(ws[-k2:nsamp].T, zs[0 : nsamp + k2])
 
         if k1 - k2 >= 0:
             R_zy = R_zy + np.dot(zs[0 : nsamp - k1 + k2].T, ys[k1 - k2 : nsamp])
@@ -155,9 +157,7 @@ def cum4x(
             tmp[zlag - k] = tmp[zlag - k] + np.dot(ziv[k:nsamp].T, xs[0 : nsamp - k])
             tmp[zlag + k] = tmp[zlag + k] + np.dot(ziv[0 : nsamp - k].T, xs[k:nsamp])
 
-        log.info(y_cum.shape)
         y_cum = y_cum + tmp * scale  # fourth-order moment estimates done
-        log.info(y_cum.shape)
 
         R_wx = cum2x(ws, xs, maxlag, nsamp, overlap0, flag)
         R_zx = cum2x(zs, xs, maxlag + abs(k2), nsamp, overlap0, flag)

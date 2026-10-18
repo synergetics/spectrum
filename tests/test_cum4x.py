@@ -42,3 +42,21 @@ def test_cum4x():
     w, x, y, z = w.reshape(-1, 1), x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)  # Reshape to 2D arrays
     cum4 = cum4x(w, x, y, z, maxlag=50, nsamp=256, overlap=50, k1=5, k2=10)
     assert cum4.shape == (101, 1)
+
+
+def test_cum4x_k2_small_positive():
+    # k2 in {1, 2} previously crashed (wrong branch condition k2 > 2)
+    rng = np.random.default_rng(6)
+    g = rng.standard_normal(4096).reshape(-1, 1)
+    for k2 in (0, 1, 2, 3):
+        c4 = cum4x(g, g, g, g, maxlag=3, nsamp=4096, k1=0, k2=k2)
+        assert c4.shape == (7, 1)
+        assert np.abs(c4).max() < 0.25  # Gaussian 4th-order cumulants ~ 0
+
+
+def test_cum4x_negative_lags():
+    rng = np.random.default_rng(7)
+    g = rng.standard_normal(4096).reshape(-1, 1)
+    c4 = cum4x(g, g, g, g, maxlag=3, nsamp=4096, k1=-1, k2=-2)
+    assert c4.shape == (7, 1)
+    assert np.abs(c4).max() < 0.25
