@@ -55,6 +55,7 @@ from .armafit import armafit, plot_arma_poles_zeros
 from .armasel import armasel, plot_ic_surface, plot_ic_comparison
 from .harmgen import harmgen, harmgen_complex, plot_harmonic_signal, harmonic_snr
 from .nlgen import nlgen, plot_nonlinear_series, nonlinear_measures
+from .trispec import trispec
 from .trispectrum import (
     trispectrum,
     tricoherence,
@@ -95,6 +96,7 @@ __all__ = [
     "nlgen",
     "plot_nonlinear_series",
     "nonlinear_measures",
+    "trispec",
     "trispectrum",
     "tricoherence",
     "plot_trispectrum",

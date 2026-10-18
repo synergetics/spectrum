@@ -763,6 +763,57 @@ static PyObject *py_cumtrue(PyObject *self, PyObject *args) {
     return (PyObject *)outa;
 }
 
+static PyObject *py_trispec(PyObject *self, PyObject *args) {
+    PyObject *yo;
+    long nfft_in, nsamp_in;
+    int overlap;
+    PyArrayObject *ya = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N, cols;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "Olli", &yo, &nfft_in, &nsamp_in, &overlap))
+        return NULL;
+    ya = py_to_c128_f(yo);
+    if (!ya) return NULL;
+    N = (size_t)PyArray_SIZE(ya);
+    cols = (PyArray_NDIM(ya) == 2) ? (size_t)PyArray_DIM(ya, 1) : 1;
+    if (overlap < 0) overlap = 0;
+    if (overlap > 99) overlap = 99;
+    st = sp_bispec_meta(N / (cols ? cols : 1), cols, nsamp_in, overlap,
+                        nfft_in, &nsamp, &nfft);
+    if (st != SP_OK) {
+        Py_DECREF(ya);
+        return PyErr_Format(PyExc_ValueError, "invalid segmentation (status %d)", (int)st);
+    }
+    if (nfft > 512) {
+        Py_DECREF(ya);
+        PyErr_SetString(PyExc_ValueError,
+                        "nfft too large for the full trispectrum cube (use spectrum.trispectrum)");
+        return NULL;
+    }
+    outa = py_new_c128(3, (npy_intp[]){(npy_intp)nfft, (npy_intp)nfft, (npy_intp)nfft});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)nfft});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_DECREF(ya);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_trispec((const sp_c128 *)PyArray_DATA(ya), N, cols, nsamp, nfft,
+                    overlap, (sp_c128 *)PyArray_DATA(outa),
+                    (double *)PyArray_DATA(waxa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(ya);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "trispec kernel error %d", (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
 /* ---- selftest ------------------------------------------------------ */
 
 static PyObject *py_selftest(PyObject *self, PyObject *args) {    double complex buf[16];
@@ -796,6 +847,7 @@ static PyMethodDef module_methods[] = {
     {"trispectrum", py_trispectrum, METH_VARARGS, "trispectrum (reduced grid)"},
     {"tricoherence", py_tricoherence, METH_VARARGS, "tricoherence"},
     {"cumtrue", py_cumtrue, METH_VARARGS, "theoretical ARMA cumulants"},
+    {"trispec", py_trispec, METH_VARARGS, "HOSA-style full trispectrum"},
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 

@@ -62,6 +62,11 @@ sp_status sp_tricoherence(const sp_c128 *y, size_t N, size_t nsamp,
                           double *tricoh_out, double *waxis_out,
                           size_t *mfi_out);
 
+/* HOSA-style full trispectrum cube with wraparound fourth index. */
+sp_status sp_trispec(const sp_c128 *y, size_t N, size_t cols, size_t nsamp,
+                     size_t nfft, int overlap, sp_c128 *t_out,
+                     double *waxis_out);
+
 #ifdef __cplusplus
 }
 #endif

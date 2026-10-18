@@ -877,3 +877,73 @@ sp_status sp_tricoherence(const sp_c128 *y, size_t N, size_t nsamp, size_t nfft,
     free(P);
     return SP_OK;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* HOSA-style full trispectrum (direct method, wraparound cube)        */
+/* ------------------------------------------------------------------ */
+
+sp_status sp_trispec(const sp_c128 *y, size_t N, size_t cols, size_t nsamp,
+                     size_t nfft, int overlap, sp_c128 *t_out,
+                     double *waxis_out) {
+    size_t ov, nadv, nrecs;
+    sp_c128 *X = NULL, *seg = NULL;
+    sp_status st;
+
+    if (!y || !t_out || !waxis_out) return SP_ERR_ARG;
+    if (nfft > 512) return SP_ERR_ARG; /* nfft^3 memory guard */
+    st = seg_counts(N / (cols ? cols : 1), cols, nsamp, overlap, &ov, &nadv,
+                    &nrecs);
+    if (st != SP_OK) return st;
+
+    memset(t_out, 0, nfft * nfft * nfft * sizeof(sp_c128));
+
+    X = (sp_c128 *)malloc(nfft * sizeof(sp_c128));
+    seg = (sp_c128 *)malloc(nsamp * sizeof(sp_c128));
+    if (!X || !seg) {
+        free(X);
+        free(seg);
+        return SP_ERR_MEM;
+    }
+
+    for (size_t k = 0; k < nrecs; k++) {
+        size_t base = k * nadv;
+        if (base + nsamp > N) {
+            free(X);
+            free(seg);
+            return SP_ERR_SHAPE;
+        }
+        memcpy(seg, y + base, nsamp * sizeof(sp_c128));
+        sp_c128 m = vec_mean(seg, nsamp);
+        memset(X, 0, nfft * sizeof(sp_c128));
+        size_t ncopy = nsamp < nfft ? nsamp : nfft;
+        for (size_t n = 0; n < ncopy; n++) X[n] = seg[n] - m;
+        if (sp_fft_forward(X, nfft) != 0) {
+            free(X);
+            free(seg);
+            return SP_ERR_INTERNAL;
+        }
+        for (size_t n = 0; n < nfft; n++) X[n] /= (double)nsamp;
+
+        for (size_t k1 = 0; k1 < nfft; k1++) {
+            sp_c128 a = X[k1];
+            for (size_t k2 = 0; k2 < nfft; k2++) {
+                sp_c128 ab = a * X[k2];
+                size_t base_ij = (k1 * nfft + k2) * nfft;
+                size_t k12 = (k1 + k2) % nfft;
+                for (size_t k3 = 0; k3 < nfft; k3++) {
+                    size_t k4 = (k12 + k3) % nfft;
+                    t_out[base_ij + k3] += ab * X[k3] * conj(X[k4]);
+                }
+            }
+        }
+    }
+
+    double inv = 1.0 / (double)nrecs;
+    for (size_t i = 0; i < nfft * nfft * nfft; i++) t_out[i] *= inv;
+    for (size_t i = 0; i < nfft; i++) waxis_out[i] = (double)i / (double)nfft;
+
+    free(X);
+    free(seg);
+    return SP_OK;
+}
