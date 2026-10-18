@@ -6,7 +6,7 @@ from scipy.linalg import hankel
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from .tools.matlab import nextpow2, flat_eq
+from .tools.matlab import flat_eq, as_column
 
 log = logging.getLogger(__file__)
 
@@ -50,18 +50,20 @@ def bicoherence(
     """
 
     # Parameter checks and adjustments
+    y = as_column(y)
     (ly, nrecs) = y.shape
     if ly == 1:
         y = y.reshape(1, -1)
         ly, nrecs = nrecs, 1
 
+    overlap = max(0, min(overlap, 99))
     if nrecs > 1:
         overlap, nsamp = 0, ly
 
-    if nrecs > 1 and nsamp <= 0:
+    if nrecs == 1 and nsamp <= 0:
         nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
     if nfft < nsamp:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     overlap = int(np.fix(nsamp * overlap / 100))
     nadvance = nsamp - overlap
