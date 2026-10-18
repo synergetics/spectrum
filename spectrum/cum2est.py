@@ -50,7 +50,7 @@ def cum2est(
 
     (n1, n2) = shape(y, 2)
     N = n1 * n2
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = int(np.fix(overlap / 100 * nsamp))
     nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 

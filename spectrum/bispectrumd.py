@@ -94,15 +94,15 @@ def bispectrumd(
         winsize = len(wind)
     elif isinstance(wind, np.ndarray):
         winsize = wind.shape[0]
+        opwind = wind
         if wind.shape[0] != wind.shape[1]:
             log.info("2-D window is not square: window ignored")
-            wind = 1
-            winsize = wind.shape[0]
-        if winsize % 2 == 0:
+            opwind = 1
+            winsize = 1
+        elif winsize % 2 == 0:
             log.info("2-D window does not have odd length: window ignored")
-            wind = 1
-            winsize = wind.shape[0]
-        opwind = wind
+            opwind = 1
+            winsize = 1
 
     # Accumulate triple products
     Bspec = np.zeros((nfft, nfft))
