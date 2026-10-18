@@ -6,7 +6,9 @@ from scipy.linalg import hankel
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from .tools.matlab import flat_eq, as_column
+from .tools.matlab import flat_eq
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -48,6 +50,10 @@ def bicoherence(
     The bicoherence is a normalized bispectrum that measures the degree of coupling
     between triple combinations of frequency components.
     """
+
+    if use_c():
+        y = as_column(y)
+        return ccall("bicoherence", y, nfft, wind, nsamp, overlap)
 
     # Parameter checks and adjustments
     y = as_column(y)

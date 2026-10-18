@@ -5,7 +5,9 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Union, Any
 
-from .tools.matlab import make_arr, as_column
+from .tools.matlab import make_arr
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 np.set_printoptions(linewidth=120)
 
@@ -57,6 +59,10 @@ def bispectrumi(
     The indirect method estimates the bispectrum by first computing third-order cumulants
     and then applying a 2D Fourier transform.
     """
+
+    if use_c():
+        y = as_column(y)
+        return ccall("bispectrumi", y, nlag, nsamp, overlap, flag, nfft, wind)
 
     y = as_column(y)
     (ly, nrecs) = y.shape

@@ -47,3 +47,10 @@ def use_c() -> bool:
 def get_backend() -> str:
     """Return the active backend name, "c" or "python"."""
     return "c" if use_c() else "python"
+
+
+def ccall(name: str, *args: Any) -> Any:
+    """Call a C-kernel function by name; only valid when use_c() is True."""
+    m = core()
+    assert m is not None
+    return getattr(m, name)(*args)

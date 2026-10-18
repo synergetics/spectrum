@@ -7,7 +7,9 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Union, Any
 
-from .tools.matlab import flat_eq, as_column
+from .tools.matlab import flat_eq
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -59,6 +61,12 @@ def bispectrumdx(
     The cross-bispectrum is a higher-order spectral analysis technique that provides information
     about the interaction between different frequency components across multiple signals.
     """
+
+    if use_c():
+        x = as_column(x)
+        y = as_column(y)
+        z = as_column(z)
+        return ccall("bispectrumdx", x, y, z, nfft, wind, nsamp, overlap)
 
     x = as_column(x)
     y = as_column(y)
@@ -144,7 +152,9 @@ def bispectrumdx(
         CZf = np.fft.fft(zseg - np.mean(zseg), nfft) / nsamp
         CZf = np.conjugate(CZf).ravel(order="F")
 
-        Bspec = Bspec + flat_eq(Bspec, (Xf * Yf.T) * CZf[mask].reshape(nfft, nfft))
+        # MATLAB BISPECDx: (Xf * Yf.') with column vectors gives
+        # (i,j) = Xf[i] * Yf[j] * conj(Zf[(i+j) mod nfft])
+        Bspec = Bspec + flat_eq(Bspec, (np.transpose(Xf) * Yf) * CZf[mask].reshape(nfft, nfft))
         locseg = locseg + int(nadvance)
 
     Bspec = np.fft.fftshift(Bspec) / nrecs

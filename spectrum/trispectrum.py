@@ -5,6 +5,7 @@ import logging
 from typing import Any, Optional, Tuple
 
 from .tools.matlab import shape
+from ._backend import use_c, ccall
 
 log = logging.getLogger(__file__)
 
@@ -182,6 +183,15 @@ def tricoherence(
 
     Values range from 0 to 1, where 1 indicates perfect quadratic phase coupling.
     """
+
+    if use_c():
+        y = np.asarray(y)
+        nsamp_res = nsamp if nsamp else y.size
+        nfft_res = nfft if nfft is not None else int(2 ** np.ceil(np.log2(nsamp_res)))
+        wtype = {None: 0, "rect": 0, "hanning": 1, "hamming": 2, "blackman": 3}.get(window)
+        if wtype is None:
+            raise ValueError(f"Unknown window type: {window}")
+        return ccall("tricoherence", y, nfft_res, wtype, nsamp_res, overlap if overlap else 0)
 
     # Compute trispectrum
     Tspec, waxis = trispectrum(y, nfft, window, nsamp, overlap)

@@ -6,7 +6,9 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Any
 
-from .tools.matlab import flat_eq, as_column
+from .tools.matlab import flat_eq
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -56,6 +58,12 @@ def bicoherencex(
     between triple combinations of frequency components from three different signals.
     """
 
+    if use_c():
+        w = as_column(w)
+        x = as_column(x)
+        y = as_column(y)
+        return ccall("bicoherencex", w, x, y, nfft, wind, nsamp, overlap)
+
     w = as_column(w)
     x = as_column(x)
     y = as_column(y)
@@ -69,14 +77,14 @@ def bicoherencex(
         x = x.reshape(1, -1)
         y = y.reshape(1, -1)
 
-    if nfft < nsamp:
-        nfft = int(2 ** np.ceil(np.log2(nsamp)))
-
     overlap = max(0, min(overlap, 99))
     if nrecs > 1:
         overlap, nsamp = 0, ly
     if nrecs == 1 and nsamp <= 0:
         nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
+
+    if nfft < nsamp:
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     overlap = int(np.fix(overlap / 100 * nsamp))
     nadvance = nsamp - overlap
@@ -126,7 +134,9 @@ def bicoherencex(
         Pyy = Pyy + flat_eq(Pyy, (Yf * CYf))
 
         Yf12 = flat_eq(Yf12, CYf.ravel(order="F")[mask])
-        bic = bic + (Wf * np.transpose(Xf)) * Yf12
+        # MATLAB BICOHERX: (Wf * Xf.') with column vectors gives
+        # (i,j) = Wf[i] * Xf[j] * conj(Yf[(i+j) mod nfft])
+        bic = bic + (np.transpose(Wf) * Xf) * Yf12
 
         ind = ind + int(nadvance)
 

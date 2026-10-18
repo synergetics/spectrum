@@ -18,6 +18,9 @@ try:
 
     compile_args = ["-O3", "-funroll-loops"]
     link_args = []
+    if os.environ.get("SPECTRUM_ASAN") == "1":
+        compile_args = ["-O1", "-g", "-fsanitize=address", "-fno-omit-frame-pointer"]
+        link_args = ["-fsanitize=address"]
     if os.environ.get("SPECTRUM_NATIVE") == "1":
         compile_args.append("-march=native")
     if os.environ.get("SPECTRUM_NO_OPENMP") != "1":
@@ -32,6 +35,7 @@ try:
                 "spectrum/src/fft/fft_iface.c",
                 "spectrum/src/fft/kissfft/kiss_fft.c",
                 "spectrum/src/estimators_cum.c",
+                "spectrum/src/estimators_bispec.c",
             ],
             include_dirs=["spectrum/src", numpy.get_include()],
             define_macros=[("kiss_fft_scalar", "double")],

@@ -17,6 +17,7 @@
 #include "common.h"
 #include "fft/fft_iface.h"
 #include "estimators_cum.h"
+#include "estimators_bispec.h"
 
 /* module-level one-time init flag for the fft engine (nothing needed yet) */
 
@@ -292,6 +293,421 @@ static PyObject *py_cum4x(PyObject *self, PyObject *args) {
     return (PyObject *)outa;
 }
 
+/* ---- bispectrum-family bindings ------------------------------------ */
+
+static int parse_window_name(PyObject *wind, const char *func_name) {
+    /* returns window_type for trispectrum-family, -1 on error */
+    if (wind == Py_None) return 0;
+    const char *s = PyUnicode_AsUTF8(wind);
+    if (!s) {
+        PyErr_SetString(PyExc_TypeError, "window must be a string or None");
+        return -1;
+    }
+    if (strcmp(s, "rect") == 0) return 0;
+    if (strcmp(s, "hanning") == 0) return 1;
+    if (strcmp(s, "hamming") == 0) return 2;
+    if (strcmp(s, "blackman") == 0) return 3;
+    PyErr_Format(PyExc_ValueError, "Unknown window type: %s", s);
+    if (func_name) {
+    }
+    return -1;
+}
+
+/* Coerce an optional 1-D real window to a contiguous double array. */
+static PyArrayObject *py_wind_to_f64(PyObject *obj) {
+    return (PyArrayObject *)PyArray_FROM_OTF(obj, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
+}
+
+static PyObject *py_bicoher_generic(PyObject *self, PyObject *args, int cross) {
+    PyObject *yo = NULL, *wo = NULL, *xo = NULL, *zo = NULL;
+    long nfft_in;
+    PyObject *wind_obj;
+    long nsamp_in;
+    int overlap;
+    PyArrayObject *wa = NULL, *xa = NULL, *ya = NULL, *za = NULL;
+    PyArrayObject *winda = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N, cols;
+    sp_status st;
+    (void)self;
+
+    if (!cross) {
+        if (!PyArg_ParseTuple(args, "OlOli", &yo, &nfft_in, &wind_obj,
+                              &nsamp_in, &overlap))
+            return NULL;
+        wo = yo;
+        xo = yo;
+        zo = yo;
+    } else {
+        if (!PyArg_ParseTuple(args, "OOOlOli", &wo, &xo, &yo, &nfft_in,
+                              &wind_obj, &nsamp_in, &overlap))
+            return NULL;
+        zo = yo;
+    }
+
+    wa = py_to_c128_f(wo);
+    xa = py_to_c128_f(xo);
+    ya = py_to_c128_f(yo);
+    za = py_to_c128_f(zo);
+    if (!wa || !xa || !ya || !za) {
+        Py_XDECREF(wa);
+        Py_XDECREF(xa);
+        Py_XDECREF(ya);
+        Py_XDECREF(za);
+        return NULL;
+    }
+    N = (size_t)PyArray_SIZE(wa);
+    cols = (PyArray_NDIM(wa) == 2) ? (size_t)PyArray_DIM(wa, 1) : 1;
+    if (overlap < 0) overlap = 0;
+    if (overlap > 99) overlap = 99;
+    st = sp_bispec_meta(N / (cols ? cols : 1), cols, nsamp_in, overlap,
+                        nfft_in, &nsamp, &nfft);
+    if (st != SP_OK) {
+        Py_DECREF(wa);
+        Py_DECREF(xa);
+        Py_DECREF(ya);
+        Py_DECREF(za);
+        return PyErr_Format(PyExc_ValueError, "invalid segmentation (status %d)",
+                            (int)st);
+    }
+    if (wind_obj != Py_None) {
+        winda = py_wind_to_f64(wind_obj);
+        if (!winda) {
+            Py_DECREF(wa);
+            Py_DECREF(xa);
+            Py_DECREF(ya);
+            Py_DECREF(za);
+            return NULL;
+        }
+        if ((size_t)PyArray_SIZE(winda) != nsamp) {
+            /* wrong-size window: fall back to the default hanning */
+            Py_DECREF(winda);
+            winda = NULL;
+        }
+    }
+    outa = py_new_c128(2, (npy_intp[]){(npy_intp)nfft, (npy_intp)nfft});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)nfft});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_XDECREF(winda);
+        Py_DECREF(wa);
+        Py_DECREF(xa);
+        Py_DECREF(ya);
+        Py_DECREF(za);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_bicoherx((const sp_c128 *)PyArray_DATA(wa),
+                     (const sp_c128 *)PyArray_DATA(xa),
+                     (const sp_c128 *)PyArray_DATA(ya), N, cols, nsamp, nfft,
+                     winda ? (const double *)PyArray_DATA(winda) : NULL,
+                     overlap, cross ? 0 : 1, (sp_c128 *)PyArray_DATA(outa),
+                     (double *)PyArray_DATA(waxa));
+    Py_END_ALLOW_THREADS
+    Py_XDECREF(winda);
+    Py_DECREF(wa);
+    Py_DECREF(xa);
+    Py_DECREF(ya);
+    Py_DECREF(za);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "bicoherence kernel error %d",
+                            (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
+static PyObject *py_bicoherence(PyObject *self, PyObject *args) {
+    return py_bicoher_generic(self, args, 0);
+}
+
+static PyObject *py_bicoherencex(PyObject *self, PyObject *args) {
+    return py_bicoher_generic(self, args, 1);
+}
+
+static PyObject *py_bispecd_generic(PyObject *self, PyObject *args, int cross) {
+    PyObject *xo = NULL, *yo = NULL, *zo = NULL;
+    long nfft_in;
+    PyObject *wind_obj;
+    long nsamp_in;
+    int overlap;
+    PyArrayObject *xa = NULL, *ya = NULL, *za = NULL, *wa = NULL;
+    PyArrayObject *winda = NULL, *mata = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N, cols;
+    sp_wind_spec spec;
+    sp_status st;
+    (void)self;
+
+    if (!cross) {
+        if (!PyArg_ParseTuple(args, "OlOli", &xo, &nfft_in, &wind_obj,
+                              &nsamp_in, &overlap))
+            return NULL;
+        yo = xo;
+        zo = xo;
+    } else {
+        if (!PyArg_ParseTuple(args, "OOOlOli", &xo, &yo, &zo, &nfft_in,
+                              &wind_obj, &nsamp_in, &overlap))
+            return NULL;
+    }
+
+    xa = py_to_c128_f(xo);
+    ya = py_to_c128_f(yo);
+    za = py_to_c128_f(zo);
+    if (!xa || !ya || !za) {
+        Py_XDECREF(xa);
+        Py_XDECREF(ya);
+        Py_XDECREF(za);
+        return NULL;
+    }
+    N = (size_t)PyArray_SIZE(xa);
+    cols = (PyArray_NDIM(xa) == 2) ? (size_t)PyArray_DIM(xa, 1) : 1;
+    if (overlap < 0) overlap = 0;
+    if (overlap > 99) overlap = 99;
+    st = sp_bispec_meta(N / (cols ? cols : 1), cols, nsamp_in, overlap,
+                        nfft_in, &nsamp, &nfft);
+    if (st != SP_OK) {
+        Py_DECREF(xa);
+        Py_DECREF(ya);
+        Py_DECREF(za);
+        return PyErr_Format(PyExc_ValueError, "invalid segmentation (status %d)",
+                            (int)st);
+    }
+
+    memset(&spec, 0, sizeof(spec));
+    spec.kind = 0;
+    spec.opt_size = 5;
+    if (wind_obj != Py_None) {
+        if (PyLong_Check(wind_obj)) {
+            spec.kind = 0;
+            spec.opt_size = (int)PyLong_AsLong(wind_obj);
+        } else if (PyArray_Check(wind_obj)) {
+            PyArrayObject *wa2 = (PyArrayObject *)wind_obj;
+            if (PyArray_NDIM(wa2) == 1) {
+                spec.kind = 1;
+                winda = py_wind_to_f64(wind_obj);
+                if (!winda) {
+                    Py_DECREF(xa);
+                    Py_DECREF(ya);
+                    Py_DECREF(za);
+                    return NULL;
+                }
+                spec.vec = (const double *)PyArray_DATA(winda);
+                spec.vec_len = (long)PyArray_SIZE(winda);
+            } else if (PyArray_NDIM(wa2) == 2 &&
+                       PyArray_DIM(wa2, 0) == PyArray_DIM(wa2, 1) &&
+                       PyArray_DIM(wa2, 0) % 2 == 1) {
+                spec.kind = 2;
+                mata = py_wind_to_f64(wind_obj);
+                if (!mata) {
+                    Py_DECREF(xa);
+                    Py_DECREF(ya);
+                    Py_DECREF(za);
+                    return NULL;
+                }
+                spec.mat = (const double *)PyArray_DATA(mata);
+                spec.mat_dim = (long)PyArray_DIM(mata, 0);
+            } else if (PyArray_NDIM(wa2) == 2) {
+                /* invalid 2-D window: warn + skip smoothing */
+                spec.kind = 0;
+                spec.opt_size = 1;
+            }
+        } else {
+            Py_DECREF(xa);
+            Py_DECREF(ya);
+            Py_DECREF(za);
+            PyErr_SetString(PyExc_TypeError, "wind must be an int or array");
+            return NULL;
+        }
+    }
+
+    outa = py_new_c128(2, (npy_intp[]){(npy_intp)nfft, (npy_intp)nfft});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)nfft});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_XDECREF(winda);
+        Py_XDECREF(mata);
+        Py_DECREF(xa);
+        Py_DECREF(ya);
+        Py_DECREF(za);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_bispecdx((const sp_c128 *)PyArray_DATA(xa),
+                     (const sp_c128 *)PyArray_DATA(ya),
+                     (const sp_c128 *)PyArray_DATA(za), N, cols, nsamp, nfft,
+                     &spec, overlap, cross ? 0 : 1,
+                     (sp_c128 *)PyArray_DATA(outa),
+                     (double *)PyArray_DATA(waxa));
+    Py_END_ALLOW_THREADS
+    Py_XDECREF(winda);
+    Py_XDECREF(mata);
+    Py_DECREF(xa);
+    Py_DECREF(ya);
+    Py_DECREF(za);
+    Py_XDECREF(wa);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "bispectrum kernel error %d",
+                            (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
+static PyObject *py_bispectrumd(PyObject *self, PyObject *args) {
+    return py_bispecd_generic(self, args, 0);
+}
+
+static PyObject *py_bispectrumdx(PyObject *self, PyObject *args) {
+    return py_bispecd_generic(self, args, 1);
+}
+
+static PyObject *py_bispectrumi(PyObject *self, PyObject *args) {
+    PyObject *yo;
+    long nlag, nsamp_in, nfft_in;
+    int overlap, wind_mode;
+    const char *flag;
+    PyObject *wind_obj;
+    PyArrayObject *ya = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N;
+    int biased;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "OllislO", &yo, &nlag, &nsamp_in, &overlap,
+                          &flag, &nfft_in, &wind_obj))
+        return NULL;
+    ya = py_to_c128_f(yo);
+    if (!ya) return NULL;
+    N = (size_t)PyArray_SIZE(ya);
+    nsamp = (nsamp_in <= 0 || (size_t)nsamp_in > N) ? N : (size_t)nsamp_in;
+    nfft = (nfft_in <= 0) ? 128 : (size_t)nfft_in;
+    biased = (strcmp(flag, "biased") == 0);
+    if (wind_obj == Py_None) {
+        wind_mode = 0; /* Parzen */
+    } else if (PyLong_Check(wind_obj)) {
+        long v = PyLong_AsLong(wind_obj);
+        wind_mode = (v == 0) ? 0 : ((v == -1) ? -1 : 1);
+    } else {
+        wind_mode = 1; /* hexagonal unity */
+    }
+    outa = py_new_c128(2, (npy_intp[]){(npy_intp)nfft, (npy_intp)nfft});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)nfft});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_DECREF(ya);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_bispeci((const sp_c128 *)PyArray_DATA(ya), N, nlag, nsamp, overlap,
+                    biased, nfft, wind_mode, (sp_c128 *)PyArray_DATA(outa),
+                    (double *)PyArray_DATA(waxa));
+    Py_END_ALLOW_THREADS
+    Py_DECREF(ya);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "bispectrumi kernel error %d",
+                            (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
+static PyObject *py_trispectrum(PyObject *self, PyObject *args) {
+    PyObject *yo;
+    long nfft_in, nsamp_in;
+    int overlap, wtype;
+    PyArrayObject *ya = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N, mfi;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "Olili", &yo, &nfft_in, &wtype, &nsamp_in,
+                          &overlap))
+        return NULL;
+    ya = py_to_c128_f(yo);
+    if (!ya) return NULL;
+    N = (size_t)PyArray_SIZE(ya);
+    nsamp = (nsamp_in <= 0 || (size_t)nsamp_in > N) ? N : (size_t)nsamp_in;
+    nfft = (size_t)(nfft_in > 0 ? nfft_in : 1);
+    mfi = (nfft / 2 + 1) < (nfft / 8) ? (nfft / 2 + 1) : (nfft / 8);
+    if (mfi == 0) {
+        Py_DECREF(ya);
+        PyErr_SetString(PyExc_ValueError, "nfft too small for trispectrum");
+        return NULL;
+    }
+    outa = py_new_c128(3, (npy_intp[]){(npy_intp)mfi, (npy_intp)mfi, (npy_intp)mfi});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)mfi});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_DECREF(ya);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_trispectrum((const sp_c128 *)PyArray_DATA(ya), N, nsamp, nfft,
+                        wtype, overlap, (sp_c128 *)PyArray_DATA(outa),
+                        (double *)PyArray_DATA(waxa), &mfi);
+    Py_END_ALLOW_THREADS
+    Py_DECREF(ya);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "trispectrum kernel error %d",
+                            (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
+static PyObject *py_tricoherence(PyObject *self, PyObject *args) {
+    PyObject *yo;
+    long nfft_in, nsamp_in;
+    int overlap, wtype;
+    PyArrayObject *ya = NULL, *outa = NULL, *waxa = NULL;
+    size_t nsamp, nfft, N, mfi;
+    sp_status st;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "Olili", &yo, &nfft_in, &wtype, &nsamp_in,
+                          &overlap))
+        return NULL;
+    ya = py_to_c128_f(yo);
+    if (!ya) return NULL;
+    N = (size_t)PyArray_SIZE(ya);
+    nsamp = (nsamp_in <= 0 || (size_t)nsamp_in > N) ? N : (size_t)nsamp_in;
+    nfft = (size_t)(nfft_in > 0 ? nfft_in : 1);
+    mfi = (nfft / 2 + 1) < (nfft / 8) ? (nfft / 2 + 1) : (nfft / 8);
+    if (mfi == 0) {
+        Py_DECREF(ya);
+        PyErr_SetString(PyExc_ValueError, "nfft too small for tricoherence");
+        return NULL;
+    }
+    outa = py_new_f64(3, (npy_intp[]){(npy_intp)mfi, (npy_intp)mfi, (npy_intp)mfi});
+    waxa = py_new_f64(1, (npy_intp[]){(npy_intp)mfi});
+    if (!outa || !waxa) {
+        Py_XDECREF(outa);
+        Py_XDECREF(waxa);
+        Py_DECREF(ya);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    st = sp_tricoherence((const sp_c128 *)PyArray_DATA(ya), N, nsamp, nfft,
+                          wtype, overlap, (double *)PyArray_DATA(outa),
+                          (double *)PyArray_DATA(waxa), &mfi);
+    Py_END_ALLOW_THREADS
+    Py_DECREF(ya);
+    if (st != SP_OK) {
+        Py_DECREF(outa);
+        Py_DECREF(waxa);
+        return PyErr_Format(PyExc_ValueError, "tricoherence kernel error %d",
+                            (int)st);
+    }
+    return Py_BuildValue("NN", (PyObject *)outa, (PyObject *)waxa);
+}
+
 /* ---- selftest ------------------------------------------------------ */
 
 static PyObject *py_selftest(PyObject *self, PyObject *args) {    double complex buf[16];
@@ -317,6 +733,13 @@ static PyMethodDef module_methods[] = {
     {"cum3x", py_cum3x, METH_VARARGS, "3rd-order cross-cumulant kernel"},
     {"cum4est", py_cum4est, METH_VARARGS, "4th-order cumulant kernel"},
     {"cum4x", py_cum4x, METH_VARARGS, "4th-order cross-cumulant kernel"},
+    {"bicoherence", py_bicoherence, METH_VARARGS, "bicoherence (direct method)"},
+    {"bicoherencex", py_bicoherencex, METH_VARARGS, "cross bicoherence"},
+    {"bispectrumd", py_bispectrumd, METH_VARARGS, "bispectrum (direct method)"},
+    {"bispectrumdx", py_bispectrumdx, METH_VARARGS, "cross bispectrum (direct)"},
+    {"bispectrumi", py_bispectrumi, METH_VARARGS, "bispectrum (indirect)"},
+    {"trispectrum", py_trispectrum, METH_VARARGS, "trispectrum (reduced grid)"},
+    {"tricoherence", py_tricoherence, METH_VARARGS, "tricoherence"},
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 

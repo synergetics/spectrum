@@ -7,7 +7,9 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Any, Union
 
-from .tools.matlab import flat_eq, as_column
+from .tools.matlab import flat_eq
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -52,6 +54,10 @@ def bispectrumd(
     The bispectrum is a higher-order spectral analysis technique that provides information
     about the interaction between different frequency components in a signal.
     """
+
+    if use_c():
+        y = as_column(y)
+        return ccall("bispectrumd", y, nfft, wind, nsamp, overlap)
 
     y = as_column(y)
     (ly, nrecs) = y.shape
