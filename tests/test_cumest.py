@@ -107,3 +107,22 @@ def test_cumest_1d_input():
     y = rng.standard_normal(256)
     c = cumest(y, 3, 4, nsamp=256)
     assert c.shape == (9, 1)
+
+
+def test_cum4est_k2_zero():
+    # k2=0 (default) previously crashed on an empty-slice assignment
+    rng = np.random.default_rng(4)
+    y = rng.standard_normal(4096).reshape(-1, 1)
+    c4 = cum4est(y, 5, 4096, 0, "biased", 0, 0)
+    assert c4.shape == (11, 1)
+    # 4th-order cumulants of Gaussian data are ~0
+    assert np.abs(c4).max() < 0.05
+
+
+def test_cum4est_gaussian_moment_products():
+    # c4 = m4 - products of 2nd-order moments; for Gaussian the result is ~0
+    rng = np.random.default_rng(5)
+    y = rng.standard_normal(20000).reshape(-1, 1)
+    for k1, k2 in [(0, 1), (1, -2), (-1, 1)]:
+        c4 = cum4est(y, 3, 20000, 0, "biased", k1, k2)
+        assert np.abs(c4).max() < 0.05

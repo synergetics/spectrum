@@ -109,10 +109,12 @@ def cum4est(
         # create the "IV" matrix: offset for third lag
         if k2 >= 0:
             z[0 : nsamp - k2] = z[0 : nsamp - k2] * x[k2:nsamp]
-            z[nsamp - k2 : nsamp] = np.zeros([k2, 1])
+            if k2 > 0:
+                z[nsamp - k2 : nsamp] = 0.0
         else:
             z[-k2:nsamp] = z[-k2:nsamp] * x[0 : nsamp + k2]
-            z[0:-k2] = np.zeros([-k2, 1])
+            if k2 < 0:
+                z[0:-k2] = 0.0
 
         tmp[zlag] = tmp[zlag] + np.dot(z.T, x)
 
