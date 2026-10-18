@@ -50,10 +50,16 @@ from .cum3x import cum3x
 from .cum4est import cum4est
 from .cum4x import cum4x
 from .cumest import cumest
+from .cumtrue import cumtrue  # noqa: E402
 from .armafit import armafit, plot_arma_poles_zeros
+from .armaqs import armaqs
+from .armarts import armarts
 from .armasel import armasel, plot_ic_surface, plot_ic_comparison
 from .harmgen import harmgen, harmgen_complex, plot_harmonic_signal, harmonic_snr
 from .nlgen import nlgen, plot_nonlinear_series, nonlinear_measures
+from .trispec import trispec
+from .doa import doa
+from .wig import tfrwv, wig2, wig2c, wig4, wig4c
 from .trispectrum import (
     trispectrum,
     tricoherence,
@@ -82,6 +88,8 @@ __all__ = [
     "cum4x",
     "cumest",
     "armafit",
+    "armaqs",
+    "armarts",
     "armasel",
     "plot_arma_poles_zeros",
     "plot_ic_surface",
@@ -90,9 +98,17 @@ __all__ = [
     "harmgen_complex",
     "plot_harmonic_signal",
     "harmonic_snr",
+    "cumtrue",
+    "doa",
     "nlgen",
     "plot_nonlinear_series",
     "nonlinear_measures",
+    "trispec",
+    "tfrwv",
+    "wig2",
+    "wig2c",
+    "wig4",
+    "wig4c",
     "trispectrum",
     "tricoherence",
     "plot_trispectrum",

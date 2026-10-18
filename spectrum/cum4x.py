@@ -87,7 +87,12 @@ def cum4x(
     nlags = 2 * maxlag + 1
     zlag = maxlag
 
-    tmp = np.zeros([nlags, 1])
+    tmp = np.zeros(
+        [nlags, 1],
+        dtype=(
+            complex if (np.iscomplexobj(w) or np.iscomplexobj(x) or np.iscomplexobj(y) or np.iscomplexobj(z)) else float
+        ),
+    )
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
         sc1 = 1 / nsamp
@@ -105,11 +110,15 @@ def cum4x(
         scale = scale.reshape(-1, 1)
 
     # estimate second- and fourth-order moments combine
-    y_cum = np.zeros([2 * maxlag + 1, 1])
+    y_cum = np.zeros(
+        [2 * maxlag + 1, 1],
+        dtype=(
+            complex if (np.iscomplexobj(w) or np.iscomplexobj(x) or np.iscomplexobj(y) or np.iscomplexobj(z)) else float
+        ),
+    )
     rind = np.arange(-maxlag, maxlag + 1)
     ind = np.arange(nsamp)
 
-    log.info(nrecs)
     for i in range(nrecs):
         tmp = y_cum * 0
         R_zy = 0
@@ -130,34 +139,35 @@ def cum4x(
         # create the "IV" matrix: offset for second lag
         if k1 >= 0:
             ziv[0 : nsamp - k1] = ws[0 : nsamp - k1] * cys[k1:nsamp]
-            R_wy = R_wy + np.dot(ws[0 : nsamp - k1].T, ys[k1:nsamp])
+            R_wy = R_wy + np.dot(np.conj(ws[0 : nsamp - k1]).ravel(), ys[k1:nsamp].ravel())
         else:
             ziv[-k1:nsamp] = ws[-k1:nsamp] * cys[0 : nsamp + k1]
-            R_wy = R_wy + np.dot(ws[-k1:nsamp].T, ys[0 : nsamp + k1])
+            R_wy = R_wy + np.dot(np.conj(ws[-k1:nsamp]).ravel(), ys[0 : nsamp + k1].ravel())
 
         # create the "IV" matrix: offset for third lag
-        if k2 > 2:
+        if k2 >= 0:
             ziv[0 : nsamp - k2] = ziv[0 : nsamp - k2] * zs[k2:nsamp]
-            ziv[nsamp - k2 : nsamp] = np.zeros([k2, 1])
-            M_wz = M_wz + np.dot(ws[0 : nsamp - k2].T, zs[k2:nsamp])
+            if k2 > 0:
+                ziv[nsamp - k2 : nsamp] = 0.0
+            M_wz = M_wz + np.dot(np.conj(ws[0 : nsamp - k2]).ravel(), zs[k2:nsamp].ravel())
         else:
             ziv[-k2:nsamp] = ziv[-k2:nsamp] * zs[0 : nsamp + k2]
-            ziv[0:-k2] = np.zeros([-k2, 1])
-            M_wz = M_wz + np.dot(ws[-k2:nsamp].T, zs[0 : nsamp - k2])
+            ziv[0:-k2] = 0.0
+            # HOSA's own CUM4X.M has a typo here (nsamp-k2); the ziv product
+            # two lines above uses nsamp+k2 and that is the intended pairing
+            M_wz = M_wz + np.dot(np.conj(ws[-k2:nsamp]).ravel(), zs[0 : nsamp + k2].ravel())
 
         if k1 - k2 >= 0:
-            R_zy = R_zy + np.dot(zs[0 : nsamp - k1 + k2].T, ys[k1 - k2 : nsamp])
+            R_zy = R_zy + np.dot(np.conj(zs[0 : nsamp - k1 + k2]).ravel(), ys[k1 - k2 : nsamp].ravel())
         else:
-            R_zy = R_zy + np.dot(zs[-k1 + k2 : nsamp].T, ys[0 : nsamp - k2 + k1])
+            R_zy = R_zy + np.dot(np.conj(zs[-k1 + k2 : nsamp]).ravel(), ys[0 : nsamp - k2 + k1].ravel())
 
-        tmp[zlag] = tmp[zlag] + np.dot(ziv.T, xs)
+        tmp[zlag] = tmp[zlag] + np.dot(np.conj(ziv).ravel(), xs.ravel())
         for k in range(1, maxlag + 1):
-            tmp[zlag - k] = tmp[zlag - k] + np.dot(ziv[k:nsamp].T, xs[0 : nsamp - k])
-            tmp[zlag + k] = tmp[zlag + k] + np.dot(ziv[0 : nsamp - k].T, xs[k:nsamp])
+            tmp[zlag - k] = tmp[zlag - k] + np.dot(np.conj(ziv[k:nsamp]).ravel(), xs[0 : nsamp - k].ravel())
+            tmp[zlag + k] = tmp[zlag + k] + np.dot(np.conj(ziv[0 : nsamp - k]).ravel(), xs[k:nsamp].ravel())
 
-        log.info(y_cum.shape)
         y_cum = y_cum + tmp * scale  # fourth-order moment estimates done
-        log.info(y_cum.shape)
 
         R_wx = cum2x(ws, xs, maxlag, nsamp, overlap0, flag)
         R_zx = cum2x(zs, xs, maxlag + abs(k2), nsamp, overlap0, flag)

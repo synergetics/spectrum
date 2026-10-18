@@ -144,3 +144,17 @@ if __name__ == "__main__":
     test_trispectrum_small_signal()
     test_tricoherence_coherent_signal()
     print("All trispectrum tests passed!")
+
+def test_trispectrum_default_nfft_and_window_validation():
+    import numpy as np
+
+    rng = np.random.default_rng(2)
+    y = rng.standard_normal(1024)
+    Tspec, waxis = trispectrum(y)
+    assert Tspec.ndim == 3
+    try:
+        trispectrum(y, nfft=64, nsamp=256, window="no-such-window")
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised

@@ -66,7 +66,7 @@ def cum4est(
     # scale factors for unbiased estimates
     nlags = 2 * maxlag + 1
     zlag = maxlag
-    tmp = np.zeros([nlags, 1])
+    tmp = np.zeros([nlags, 1], dtype=complex if np.iscomplexobj(y) else float)
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
     else:
@@ -89,7 +89,7 @@ def cum4est(
         complex_flag = 0
 
     # estimate second- and fourth-order moments combine
-    y_cum = np.zeros([2 * maxlag + 1, 1])
+    y_cum = np.zeros([2 * maxlag + 1, 1], dtype=complex if np.iscomplexobj(y) else float)
     R_yy = np.zeros([2 * mlag + 1, 1])
 
     ind = np.arange(nsamp)
@@ -109,23 +109,26 @@ def cum4est(
         # create the "IV" matrix: offset for third lag
         if k2 >= 0:
             z[0 : nsamp - k2] = z[0 : nsamp - k2] * x[k2:nsamp]
-            z[nsamp - k2 : nsamp] = np.zeros([k2, 1])
+            if k2 > 0:
+                z[nsamp - k2 : nsamp] = 0.0
         else:
             z[-k2:nsamp] = z[-k2:nsamp] * x[0 : nsamp + k2]
-            z[0:-k2] = np.zeros([-k2, 1])
+            if k2 < 0:
+                z[0:-k2] = 0.0
 
-        tmp[zlag] = tmp[zlag] + np.dot(z.T, x)
+        tmp[zlag] = tmp[zlag] + np.dot(np.conj(z), x)
 
         for k in range(1, maxlag + 1):
-            tmp[zlag - k] = tmp[zlag - k] + np.dot(z[k:nsamp].T, x[0 : nsamp - k])
-            tmp[zlag + k] = tmp[zlag + k] + np.dot(z[0 : nsamp - k].T, x[k:nsamp])
+            tmp[zlag - k] = tmp[zlag - k] + np.dot(np.conj(z[k:nsamp]), x[0 : nsamp - k])
+            tmp[zlag + k] = tmp[zlag + k] + np.dot(np.conj(z[0 : nsamp - k]), x[k:nsamp])
 
         y_cum = y_cum + tmp * scale
 
         R_yy = cum2est(x, mlag, nsamp, overlap0, flag)
         #  We need E x(t)x(t+tau) stuff also:
         if complex_flag:
-            M_yy = cum2x(np.conj(x), x, mlag, nsamp, overlap0, flag)
+            xc = np.conj(x).reshape(-1, 1)
+            M_yy = cum2x(xc, x.reshape(-1, 1), mlag, nsamp, overlap0, flag)
         else:
             M_yy = R_yy
 

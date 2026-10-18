@@ -87,7 +87,9 @@ def cum3x(
 
     nlags = 2 * maxlag + 1
     zlag = maxlag
-    y_cum = np.zeros([nlags, 1])
+    y_cum = np.zeros(
+        [nlags, 1], dtype=complex if (np.iscomplexobj(x) or np.iscomplexobj(y) or np.iscomplexobj(z)) else float
+    )
 
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
@@ -117,11 +119,11 @@ def cum3x(
         u = np.zeros([nsamp, 1])
         u[indx] = xs[indx] * zs[indz]
 
-        y_cum[zlag] = y_cum[zlag] + np.dot(u.T, ys)
+        y_cum[zlag] = y_cum[zlag] + np.dot(np.conj(u).ravel(), ys.ravel())
 
         for m in range(1, maxlag + 1):
-            y_cum[zlag - m] = y_cum[zlag - m] + np.dot(u[m:nsamp].T, ys[0 : nsamp - m])
-            y_cum[zlag + m] = y_cum[zlag + m] + np.dot(u[0 : nsamp - m].T, ys[m:nsamp])
+            y_cum[zlag - m] = y_cum[zlag - m] + np.dot(np.conj(u[m:nsamp]).ravel(), ys[0 : nsamp - m].ravel())
+            y_cum[zlag + m] = y_cum[zlag + m] + np.dot(np.conj(u[0 : nsamp - m]).ravel(), ys[m:nsamp].ravel())
 
         ind = ind + int(nadvance)
 

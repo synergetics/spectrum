@@ -1,6 +1,7 @@
 import scipy.io as sio
 import numpy as np
 from spectrum import cum2est, cum3est, cum4est
+from spectrum import cumest
 
 
 def test_specific_2est():
@@ -74,3 +75,65 @@ def test_specific_4est():
         0.4230397918730159,
         -0.997249679819298,
     ]
+
+
+def test_cumest_default_nsamp():
+    # nsamp=None (default) falls back to data length instead of crashing
+    rng = np.random.default_rng(0)
+    y = rng.standard_normal(256).reshape(-1, 1)
+    c = cumest(y, 2, 5)
+    assert c.shape == (11, 1)
+
+
+def test_cumest_order4_dispatch():
+    # norder=4 must reach cum4est, not cum3est
+    rng = np.random.default_rng(1)
+    y = rng.standard_normal(512).reshape(-1, 1)
+    via_cumest = cumest(y, 4, 3, nsamp=512, k1=1, k2=1)
+    direct = cum4est(y, 3, 512, 0, "biased", 1, 1)
+    assert np.allclose(via_cumest, direct)
+
+
+def test_cumest_flag_normalization():
+    # MATLAB: any flag not starting with b/B means unbiased
+    rng = np.random.default_rng(2)
+    y = rng.standard_normal(256).reshape(-1, 1)
+    assert np.allclose(cumest(y, 2, 3, nsamp=256, flag="Unbiased"), cumest(y, 2, 3, nsamp=256, flag="unbiased"))
+    assert np.allclose(cumest(y, 2, 3, nsamp=256, flag="b"), cumest(y, 2, 3, nsamp=256, flag="biased"))
+
+
+def test_cumest_1d_input():
+    rng = np.random.default_rng(3)
+    y = rng.standard_normal(256)
+    c = cumest(y, 3, 4, nsamp=256)
+    assert c.shape == (9, 1)
+
+
+def test_cum4est_k2_zero():
+    # k2=0 (default) previously crashed on an empty-slice assignment
+    rng = np.random.default_rng(4)
+    y = rng.standard_normal(4096).reshape(-1, 1)
+    c4 = cum4est(y, 5, 4096, 0, "biased", 0, 0)
+    assert c4.shape == (11, 1)
+    # 4th-order cumulants of Gaussian data are ~0 (estimator std ~ 0.08)
+    assert np.abs(c4).max() < 0.25
+
+
+def test_cum4est_gaussian_moment_products():
+    # c4 = m4 - products of 2nd-order moments; for Gaussian the result is ~0
+    rng = np.random.default_rng(5)
+    y = rng.standard_normal(20000).reshape(-1, 1)
+    for k1, k2 in [(0, 1), (1, -2), (-1, 1)]:
+        c4 = cum4est(y, 3, 20000, 0, "biased", k1, k2)
+        assert np.abs(c4).max() < 0.15
+
+
+def test_cum2est_complex_convention():
+    # MATLAB CUM2EST computes C2(m) = E[x*(n) x(n+m)] (the ' operator conjugates)
+    rng = np.random.default_rng(20)
+    x = (rng.standard_normal(64) + 1j * rng.standard_normal(64)).reshape(-1, 1)
+    c2 = cum2est(x, 3, 64, 0, "biased").ravel()
+    xm = x.ravel() - x.ravel().mean()
+    # biased estimate: divide by nsamp (not the shrinking window length)
+    expect = [np.dot(np.conj(xm[: 64 - m]), xm[m:]) / 64 for m in (3, 2, 1, 0)]
+    assert np.allclose(c2, [np.conj(expect[0]), np.conj(expect[1]), np.conj(expect[2]), expect[3], expect[2], expect[1], expect[0]])

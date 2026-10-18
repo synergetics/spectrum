@@ -426,7 +426,7 @@ def _lyapunov_estimate(x: np.ndarray, tau: int = 1, m: int = 3) -> float:
                 nearest_idx += 1
 
             # Track divergence
-            for k in range(1, min(10, len(embedded) - int(max(i, nearest_idx)))):
+            for k in range(1, min(10, len(embedded) - int(max(int(i), int(nearest_idx))))):
                 if i + k < len(embedded) and nearest_idx + k < len(embedded):
                     dist = np.linalg.norm(embedded[i + k] - embedded[nearest_idx + k])
                     if dist > 0:

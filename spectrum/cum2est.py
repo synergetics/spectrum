@@ -50,11 +50,11 @@ def cum2est(
 
     (n1, n2) = shape(y, 2)
     N = n1 * n2
-    overlap = np.fix(overlap / 100 * nsamp)
+    overlap = int(np.fix(overlap / 100 * nsamp))
     nrecord = int(np.fix((N - overlap) / (nsamp - overlap)))
     nadvance = nsamp - overlap
 
-    y_cum = np.zeros([maxlag + 1, 1])
+    y_cum = np.zeros([maxlag + 1, 1], dtype=complex if np.iscomplexobj(y) else float)
     ind = np.arange(nsamp)
     y = y.ravel(order="F")
 
@@ -63,7 +63,7 @@ def cum2est(
         x = x - np.mean(x)
 
         for k in range(maxlag + 1):
-            y_cum[k] = y_cum[k] + np.dot(x[0 : nsamp - k].T, x[k:nsamp])
+            y_cum[k] = y_cum[k] + np.dot(np.conj(x[0 : nsamp - k]), x[k:nsamp])
 
         ind = ind + int(nadvance)
 

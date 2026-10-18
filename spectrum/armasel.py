@@ -121,6 +121,8 @@ def armasel(
                 continue
 
     # Find optimal order
+    if np.isinf(ic_matrix).all():
+        raise RuntimeError("armafit failed for every candidate order (p, q)")
     min_idx = np.unravel_index(np.argmin(ic_matrix), ic_matrix.shape)
     p_opt = min_idx[0]
     q_opt = min_idx[1]
@@ -216,7 +218,7 @@ def plot_ic_comparison(
     try:
         import matplotlib.pyplot as plt
 
-        results = {}
+        results: dict = {}
         for criterion in criteria:
             p_opt, q_opt, ic_min, ic_matrix = armasel(y, pmax, qmax, criterion=criterion, **kwargs)
             results[criterion] = {"p_opt": p_opt, "q_opt": q_opt, "ic_min": ic_min, "ic_matrix": ic_matrix}

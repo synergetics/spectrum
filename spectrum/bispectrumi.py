@@ -5,7 +5,9 @@ import logging
 import matplotlib.pyplot as plt
 from typing import Tuple, Optional, Union, Any
 
-from .tools.matlab import nextpow2, make_arr
+from .tools.matlab import make_arr
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 np.set_printoptions(linewidth=120)
 
@@ -58,6 +60,11 @@ def bispectrumi(
     and then applying a 2D Fourier transform.
     """
 
+    if use_c():
+        y = as_column(y)
+        return ccall("bispectrumi", y, nlag, nsamp, overlap, flag, nfft, wind)
+
+    y = as_column(y)
     (ly, nrecs) = y.shape
     if ly == 1:
         y = y.reshape(1, -1)
@@ -75,10 +82,11 @@ def bispectrumi(
     if wind is None:
         wind = 0
 
-    if nlag == 0:
-        nlag = min(nlag, nsamp - 1)
+    nlag = min(nlag, nsamp - 1)
+    if nlag < 1:
+        raise ValueError('"nlag" must be a positive integer (see MATLAB BISPECI: nlag must be specified)')
     if nfft < 2 * nlag + 1:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
 
     # Create the lag window
     Bspec = np.zeros((nfft, nfft))
@@ -106,7 +114,7 @@ def bispectrumi(
         for j in range(nlag + 1):
             z = x[: nsamp - j] * x[j:nsamp]
             for i in range(j, nlag + 1):
-                Sum = np.dot(z[: nsamp - i].T, x[i:nsamp])
+                Sum = np.dot(np.conj(z[: nsamp - i]), x[i:nsamp])
                 if flag == "biased":
                     Sum = Sum / nsamp
                 else:

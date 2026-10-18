@@ -7,7 +7,9 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from typing import Tuple, Any, Union
 
-from .tools.matlab import nextpow2, flat_eq
+from .tools.matlab import flat_eq
+from ._backend import use_c, ccall
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -53,6 +55,11 @@ def bispectrumd(
     about the interaction between different frequency components in a signal.
     """
 
+    if use_c():
+        y = as_column(y)
+        return ccall("bispectrumd", y, nfft, wind, nsamp, overlap)
+
+    y = as_column(y)
     (ly, nrecs) = y.shape
 
     overlap = min(99, max(overlap, 0))
@@ -62,7 +69,7 @@ def bispectrumd(
     if nrecs == 1 and nsamp <= 0:
         nsamp = int(np.fix(ly / (8 - 7 * overlap / 100)))
     if nfft < nsamp:
-        nfft = 2 ** nextpow2(nsamp)
+        nfft = int(2 ** np.ceil(np.log2(nsamp)))
     overlap = int(np.fix(nsamp * overlap / 100))
     nadvance = nsamp - overlap
     nrecs = int(np.fix((ly * nrecs - overlap) / nadvance))
@@ -89,20 +96,23 @@ def bispectrumd(
         else:
             opwind = 1
     elif isinstance(wind, np.ndarray) and wind.ndim == 1:
+        # MATLAB zero-pads the window before the hankel product:
+        # window = [wind; zeros(l-1,1)]; winsize = 2*l - 1
+        window = np.concatenate((wind, np.zeros(len(wind) - 1)))
         windf = np.concatenate((wind[:0:-1], wind))
-        opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(wind), wind)
-        winsize = len(wind)
+        opwind = (windf[:, np.newaxis] * windf) * hankel(np.flipud(window), window)
+        winsize = len(window)
     elif isinstance(wind, np.ndarray):
         winsize = wind.shape[0]
+        opwind = wind
         if wind.shape[0] != wind.shape[1]:
             log.info("2-D window is not square: window ignored")
-            wind = 1
-            winsize = wind.shape[0]
-        if winsize % 2 == 0:
+            opwind = 1
+            winsize = 1
+        elif winsize % 2 == 0:
             log.info("2-D window does not have odd length: window ignored")
-            wind = 1
-            winsize = wind.shape[0]
-        opwind = wind
+            opwind = 1
+            winsize = 1
 
     # Accumulate triple products
     Bspec = np.zeros((nfft, nfft))
@@ -119,11 +129,10 @@ def bispectrumd(
 
     Bspec = np.fft.fftshift(Bspec) / nrecs
 
-    # Frequency-domain smoothing
+    # Frequency-domain smoothing: full convolution + center crop is
+    # equivalent to mode='same' for odd square kernels -> nfft x nfft output
     if winsize > 1:
-        lby2 = int((winsize - 1) / 2)
         Bspec = convolve2d(Bspec, opwind, mode="same")
-        Bspec = Bspec[lby2 : lby2 + nfft, lby2 : lby2 + nfft]
 
     if nfft % 2 == 0:
         waxis = np.transpose(np.arange(-nfft // 2, nfft // 2)) / nfft

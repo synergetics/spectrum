@@ -81,3 +81,22 @@ if __name__ == "__main__":
     test_armafit_arma()
     test_plot_arma_poles_zeros()
     print("All armafit tests passed!")
+
+def test_armafit_recovers_ar2():
+    rng = np.random.default_rng(10)
+    n = 20000
+    e = rng.standard_normal(n)
+    a_true = np.array([1.0, -0.5, 0.2])
+    y = np.zeros(n)
+    for i in range(2, n):
+        y[i] = 0.5 * y[i - 1] - 0.2 * y[i - 2] + e[i]
+    a, b, rho = armafit(y.reshape(-1, 1), p=2, q=0)
+    assert np.allclose(a, a_true, atol=0.1)
+    assert rho > 0
+
+
+def test_armafit_1d_input():
+    rng = np.random.default_rng(11)
+    y = rng.standard_normal(4096)
+    a, b, rho = armafit(y, p=1, q=0)
+    assert a[0] == 1.0 and len(a) == 2

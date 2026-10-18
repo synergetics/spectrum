@@ -1,0 +1,5 @@
+include LICENSE README.md CHANGELOG.md
+recursive-include spectrum/src *.c *.h
+include spectrum/src/fft/kissfft/COPYING
+recursive-include tests *.py *.mat
+include tests/bench/bench_core.py

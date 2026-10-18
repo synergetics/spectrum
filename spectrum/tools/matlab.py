@@ -58,7 +58,23 @@ def shape(o: np.ndarray[Any, np.dtype[Any]], n: int):
     """
     s = o.shape
     if len(s) < n:
-        x = tuple(np.ones(n - len(s)))
+        x = tuple([1] * (n - len(s)))
         return s + x
     else:
         return s
+
+
+def as_column(y: np.ndarray[Any, np.dtype[Any]]) -> np.ndarray[Any, np.dtype[Any]]:
+    """
+    Normalize input to a 2-D array shaped (samples, realizations).
+
+    MATLAB estimators accept row vectors, column vectors and matrices;
+    1-D numpy arrays and row vectors are treated as a single realization
+    and reshaped to a column, like MATLAB's y = y(:).
+    """
+    arr = np.asarray(y)
+    if arr.ndim == 1:
+        return arr.reshape(-1, 1)
+    if arr.ndim == 2 and arr.shape[0] == 1:
+        return arr.reshape(-1, 1)
+    return arr

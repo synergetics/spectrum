@@ -7,6 +7,8 @@ from typing import Any, Optional
 
 from .cum2est import cum2est
 from .cum3est import cum3est
+from .cum4est import cum4est
+from .tools.matlab import as_column
 
 log = logging.getLogger(__file__)
 
@@ -70,6 +72,7 @@ def cumest(
     cum2est, cum3est, cum4est : Individual functions for specific cumulant orders.
     """
 
+    y = as_column(y)
     (ksamp, nrecs) = y.shape
     if ksamp == 1:
         ksamp = nrecs
@@ -83,15 +86,17 @@ def cumest(
 
     if nrecs > 1:
         nsamp = ksamp
-    if nsamp <= 0 or nsamp > ksamp:  # type: ignore
+    if nsamp is None or nsamp <= 0 or nsamp > ksamp:
         nsamp = ksamp
 
     if nrecs > 1:
         overlap = 0
     overlap = max(0, min(overlap, 99))
 
-    if nsamp is None:
-        raise ValueError("Number of samples is None")
+    if flag is None or flag[0] not in ("b", "B"):
+        flag = "unbiased"
+    else:
+        flag = "biased"
 
     # estimate the cumulants
     if norder == 2:
@@ -99,6 +104,6 @@ def cumest(
     elif norder == 3:
         y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1)
     elif norder == 4:
-        y_cum = cum3est(y, maxlag, nsamp, overlap, flag, k1)
+        y_cum = cum4est(y, maxlag, nsamp, overlap, flag, k1, k2)
 
     return y_cum

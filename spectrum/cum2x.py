@@ -79,7 +79,7 @@ def cum2x(
 
     nlags = 2 * maxlag + 1
     zlag = maxlag
-    y_cum = np.zeros([nlags, 1])
+    y_cum = np.zeros([nlags, 1], dtype=complex if (np.iscomplexobj(x) or np.iscomplexobj(y)) else float)
 
     if flag == "biased":
         scale = np.ones([nlags, 1]) / nsamp
@@ -94,11 +94,11 @@ def cum2x(
         ys = y[ind].ravel(order="F")
         ys = ys - np.mean(ys)
 
-        y_cum[zlag] = y_cum[zlag] + np.dot(xs, ys)
+        y_cum[zlag] = y_cum[zlag] + np.dot(np.conj(xs), ys)
 
         for m in range(1, maxlag + 1):
-            y_cum[zlag - m] = y_cum[zlag - m] + np.dot(xs[m:nsamp].T, ys[0 : nsamp - m])
-            y_cum[zlag + m] = y_cum[zlag + m] + np.dot(xs[0 : nsamp - m].T, ys[m:nsamp])
+            y_cum[zlag - m] = y_cum[zlag - m] + np.dot(np.conj(xs[m:nsamp]), ys[0 : nsamp - m])
+            y_cum[zlag + m] = y_cum[zlag + m] + np.dot(np.conj(xs[0 : nsamp - m]), ys[m:nsamp])
 
         ind = ind + int(nadvance)
 
